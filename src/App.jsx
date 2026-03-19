@@ -66,6 +66,7 @@ export default function App() {
   const [error, setError] = useState(null);
   const [filterHeat, setFilterHeat] = useState('All');
   const [selected, setSelected] = useState(new Set());
+  const [dismissed, setDismissed] = useState(new Set());
   const [lastSearched, setLastSearched] = useState('');
 
   async function handleSearch() {
@@ -74,6 +75,7 @@ export default function App() {
     setError(null);
     setProspects(null);
     setSelected(new Set());
+    setDismissed(new Set());
     setFilterHeat('All');
 
     try {
@@ -109,18 +111,29 @@ export default function App() {
     });
   }
 
+  function handleDismiss(name) {
+    setDismissed((prev) => new Set([...prev, name]));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.delete(name);
+      return next;
+    });
+  }
+
   function handleExport() {
-    if (!prospects) return;
+    if (!visible) return;
     const toExport = selected.size > 0
-      ? prospects.filter((p) => selected.has(p.name))
-      : prospects;
+      ? visible.filter((p) => selected.has(p.name))
+      : visible;
     exportToCSV(toExport, lastSearched);
   }
 
-  const filtered = prospects
+  const visible = prospects ? prospects.filter((p) => !dismissed.has(p.name)) : null;
+
+  const filtered = visible
     ? filterHeat === 'All'
-      ? prospects
-      : prospects.filter((p) => p.heatScore === filterHeat)
+      ? visible
+      : visible.filter((p) => p.heatScore === filterHeat)
     : null;
 
   return (
@@ -177,8 +190,9 @@ export default function App() {
         {filtered && !loading && (
           <div className="space-y-4">
             <SummaryBar
-              prospects={prospects}
+              prospects={visible}
               selectedCount={selected.size}
+              dismissedCount={dismissed.size}
               onExport={handleExport}
             />
 
@@ -216,6 +230,7 @@ export default function App() {
                   index={i}
                   isSelected={selected.has(company.name)}
                   onToggleSelect={handleToggleSelect}
+                  onDismiss={handleDismiss}
                 />
               ))}
             </div>

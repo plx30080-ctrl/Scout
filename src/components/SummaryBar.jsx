@@ -1,6 +1,6 @@
 // components/SummaryBar.jsx
 
-export default function SummaryBar({ prospects, selectedCount, onExport }) {
+export default function SummaryBar({ prospects, selectedCount, dismissedCount, onExport }) {
   const hot = prospects.filter((p) => p.heatScore === 'Hot').length;
   const warm = prospects.filter((p) => p.heatScore === 'Warm').length;
   const totalRoles = prospects.reduce((sum, p) => sum + (p.openRoles || 0), 0);
@@ -15,12 +15,14 @@ export default function SummaryBar({ prospects, selectedCount, onExport }) {
         {totalRoles > 0 && (
           <span className="text-violet-400 font-semibold">{totalRoles} open roles</span>
         )}
+        {dismissedCount > 0 && (
+          <span className="text-slate-600 font-medium">{dismissedCount} dismissed</span>
+        )}
       </div>
       <button
         onClick={onExport}
-        disabled={selectedCount === 0}
-        title={selectedCount === 0 ? 'Check boxes on cards to select for export' : `Export ${selectedCount} selected`}
-        className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+        title={selectedCount > 0 ? `Export ${selectedCount} selected` : `Export all ${prospects.length} prospects`}
+        className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 transition-all"
       >
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path
@@ -30,7 +32,7 @@ export default function SummaryBar({ prospects, selectedCount, onExport }) {
             d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
           />
         </svg>
-        {selectedCount > 0 ? `Export ${selectedCount} selected` : 'Export CSV'}
+        {selectedCount > 0 ? `Export ${selectedCount} selected` : `Export all (${prospects.length})`}
       </button>
     </div>
   );

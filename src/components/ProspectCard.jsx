@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { HeatBadge, BrandBadge, JobBadge } from './Badges';
 
-export default function ProspectCard({ company, index, isSelected, onToggleSelect }) {
+export default function ProspectCard({ company, index, isSelected, onToggleSelect, onDismiss }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -28,11 +28,11 @@ export default function ProspectCard({ company, index, isSelected, onToggleSelec
               <span className="text-slate-700">·</span>
               <span>{company.estimatedSize}</span>
               <span className="text-slate-700">·</span>
-              <span>{company.location}</span>
+              <span>{company.address || company.location}</span>
             </div>
           </div>
 
-          {/* Right: job badge + checkbox */}
+          {/* Right: job badge + checkbox + dismiss */}
           <div className="flex items-center gap-2.5 shrink-0">
             <JobBadge count={company.openRoles} />
             <button
@@ -49,6 +49,15 @@ export default function ProspectCard({ company, index, isSelected, onToggleSelec
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                 </svg>
               )}
+            </button>
+            <button
+              onClick={() => onDismiss(company.name)}
+              title="Dismiss — not a viable prospect"
+              className="w-5 h-5 rounded flex items-center justify-center text-slate-600 hover:text-slate-300 hover:bg-slate-700/60 transition-all shrink-0"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           </div>
         </div>
@@ -85,7 +94,7 @@ export default function ProspectCard({ company, index, isSelected, onToggleSelec
           >
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
-          {expanded ? 'Hide' : 'View'} talking points
+          {expanded ? 'Hide details' : 'View talking points & open roles'}
         </button>
 
         {/* Talking points + job roles */}
@@ -103,9 +112,14 @@ export default function ProspectCard({ company, index, isSelected, onToggleSelec
 
             {company.jobRoles?.length > 0 && (
               <div className="mt-3.5 pt-3.5 border-t border-slate-700/50">
-                <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">
-                  Actively Hiring For
-                </p>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
+                    Actively Hiring For
+                  </p>
+                  {company.hiringRecency && (
+                    <span className="text-[10px] text-slate-500 italic">{company.hiringRecency}</span>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-1.5">
                   {company.jobRoles.map((role, i) => (
                     <span
