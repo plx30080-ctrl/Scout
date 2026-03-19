@@ -12,7 +12,7 @@ const INDUSTRIES = [
 
 const RADIUS_OPTIONS = ['10 miles', '25 miles', '50 miles', '100 miles'];
 
-export default function SearchPanel({ location, setLocation, radius, setRadius, industry, setIndustry, onSearch, loading }) {
+export default function SearchPanel({ location, setLocation, radius, setRadius, industry, setIndustry, stateRestriction, setStateRestriction, onSearch, loading }) {
   return (
     <div className="rounded-2xl border border-slate-700/60 bg-slate-800/30 p-6 space-y-5">
       <div>
@@ -22,9 +22,9 @@ export default function SearchPanel({ location, setLocation, radius, setRadius, 
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
         {/* Location */}
-        <div className="sm:col-span-1 flex flex-col gap-1.5">
+        <div className="sm:col-span-2 flex flex-col gap-1.5">
           <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
             Location
           </label>
@@ -35,6 +35,22 @@ export default function SearchPanel({ location, setLocation, radius, setRadius, 
             onKeyDown={(e) => e.key === 'Enter' && !loading && location.trim() && onSearch()}
             placeholder="City, state or zip"
             className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900/60 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/20 transition-all"
+          />
+        </div>
+
+        {/* State restriction */}
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
+            Restrict to State
+          </label>
+          <input
+            type="text"
+            value={stateRestriction}
+            onChange={(e) => setStateRestriction(e.target.value.toUpperCase().slice(0, 2))}
+            onKeyDown={(e) => e.key === 'Enter' && !loading && location.trim() && onSearch()}
+            placeholder="e.g. OH"
+            maxLength={2}
+            className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900/60 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/20 transition-all font-mono tracking-widest uppercase"
           />
         </div>
 
@@ -53,22 +69,22 @@ export default function SearchPanel({ location, setLocation, radius, setRadius, 
             ))}
           </select>
         </div>
+      </div>
 
-        {/* Industry */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
-            Industry
-          </label>
-          <select
-            value={industry}
-            onChange={(e) => setIndustry(e.target.value)}
-            className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900/60 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-emerald-500/60 transition-all cursor-pointer appearance-none"
-          >
-            {INDUSTRIES.map((i) => (
-              <option key={i}>{i}</option>
-            ))}
-          </select>
-        </div>
+      {/* Industry — full width row */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
+          Industry
+        </label>
+        <select
+          value={industry}
+          onChange={(e) => setIndustry(e.target.value)}
+          className="w-full px-3.5 py-2.5 rounded-lg bg-slate-900/60 border border-slate-700 text-slate-100 text-sm focus:outline-none focus:border-emerald-500/60 transition-all cursor-pointer appearance-none"
+        >
+          {INDUSTRIES.map((i) => (
+            <option key={i}>{i}</option>
+          ))}
+        </select>
       </div>
 
       <button

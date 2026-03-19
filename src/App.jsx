@@ -61,6 +61,7 @@ export default function App() {
   const [location, setLocation] = useState('');
   const [radius, setRadius] = useState('25 miles');
   const [industry, setIndustry] = useState('All Industries');
+  const [stateRestriction, setStateRestriction] = useState('');
   const [loading, setLoading] = useState(false);
   const [prospects, setProspects] = useState(null);
   const [error, setError] = useState(null);
@@ -81,7 +82,7 @@ export default function App() {
     try {
       const raw = await callAI(
         TERRITORY_SYSTEM_PROMPT,
-        buildTerritoryUserPrompt(location, radius, industry)
+        buildTerritoryUserPrompt(location, radius, industry, stateRestriction.trim() || null)
       );
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) throw new Error('Unexpected response format.');
@@ -175,6 +176,8 @@ export default function App() {
           setRadius={setRadius}
           industry={industry}
           setIndustry={setIndustry}
+          stateRestriction={stateRestriction}
+          setStateRestriction={setStateRestriction}
           onSearch={handleSearch}
           loading={loading}
         />
