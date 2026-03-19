@@ -47,6 +47,67 @@ Talking points must be specific to the company, not generic. Reference their ind
 
 Respond ONLY with a valid JSON array. No markdown fences, no explanation, no preamble.`;
 
+// ─── Call Prep Cards ──────────────────────────────────────────────────────────
+
+export const CALL_PREP_SYSTEM_PROMPT = `You are a sales coach for Employbridge, a staffing company with two brands:
+- ProLogistix: staffing for logistics, warehouse, distribution, and e-commerce fulfillment
+- ResourceMFG: staffing for manufacturing, production, food & beverage, and industrial operations
+
+Your job is to produce a concise pre-call briefing card that a field sales rep can scan in 60 seconds before walking into a meeting or dialing a prospect. Be specific, practical, and direct. Avoid generic filler — every line should be usable.
+
+Return ONLY a valid JSON object in exactly this structure:
+{
+  "companySnapshot": "2-3 sentence summary of what this company does, their scale, and what makes them relevant as a staffing prospect",
+  "likelyPainPoints": [
+    "Specific pain point 1 relevant to their industry and size",
+    "Specific pain point 2",
+    "Specific pain point 3"
+  ],
+  "suggestedTalkingPoints": [
+    "Concrete talking point 1 the rep can use verbatim or near-verbatim",
+    "Concrete talking point 2",
+    "Concrete talking point 3"
+  ],
+  "questionsToAsk": [
+    "Open-ended discovery question 1",
+    "Open-ended discovery question 2",
+    "Open-ended discovery question 3",
+    "Open-ended discovery question 4"
+  ],
+  "objectionHandling": [
+    { "objection": "Most likely objection 1", "response": "Suggested response" },
+    { "objection": "Most likely objection 2", "response": "Suggested response" },
+    { "objection": "Most likely objection 3", "response": "Suggested response" }
+  ],
+  "brandFit": "One paragraph explaining specifically why ProLogistix or ResourceMFG (name the brand) is the right fit for this company, and what differentiates Employbridge from generic staffing agencies for their needs",
+  "iceBreakers": [
+    "Natural conversation opener 1 referencing something specific about the company",
+    "Natural conversation opener 2"
+  ]
+}
+
+No markdown fences, no explanation, no preamble. Return only the JSON object.`;
+
+export function buildCallPrepUserPrompt(company) {
+  const fields = [];
+
+  if (company.industry)      fields.push(`Industry: ${company.industry}`);
+  if (company.estimatedSize) fields.push(`Size: ${company.estimatedSize}`);
+  if (company.address || company.location) fields.push(`Location: ${company.address || company.location}`);
+  if (company.heatScore)     fields.push(`Heat signal: ${company.heatScore} — ${company.heatReason || ''}`);
+  if (company.jobRoles?.length) fields.push(`Currently hiring: ${company.jobRoles.join(', ')}`);
+  if (company.newsSignal)    fields.push(`Recent news: ${company.newsSignal}`);
+  if (company.talkingPoints?.length) fields.push(`Existing intel:\n${company.talkingPoints.map(t => `- ${t}`).join('\n')}`);
+  if (company.brand)         fields.push(`Likely brand fit: ${company.brand}`);
+  if (company.notes)         fields.push(`Rep notes: ${company.notes}`);
+
+  const context = fields.length > 0 ? `\n\nAvailable intel:\n${fields.join('\n')}` : '';
+
+  return `Generate a call prep card for: ${company.name}${context}
+
+Produce a briefing card that helps a staffing sales rep have the most effective first conversation possible with this prospect.`;
+}
+
 export function buildTerritoryUserPrompt(location, radius, industry, stateRestriction) {
   const industryClause =
     industry === 'All Industries'

@@ -60,3 +60,24 @@ select {
 .spin-reverse {
   animation: spin 1.4s linear infinite reverse;
 }
+
+/* ─── Print styles for Call Prep Cards ─────────────────────────────────────── */
+@media print {
+  header, nav, footer,
+  .no-print { display: none !important; }
+
+  body { background: white !important; color: black !important; }
+
+  main { max-width: 100% !important; padding: 0 !important; }
+
+  .print-section {
+    border: 1px solid #ccc !important;
+    break-inside: avoid;
+  }
+
+  /* Force all accordion sections open */
+  .print-section > div { display: block !important; }
+
+  button { display: none !important; }
+  textarea, input, select { display: none !important; }
+}
