@@ -1,330 +1,488 @@
-# Scout — Setup & Deployment Guide
+# Scout — Azure Setup Guide
 
-Scout is an AI-powered territory research tool for Employbridge field sales reps. This guide walks through everything from first-time setup to deploying on GitHub Pages and switching to Azure OpenAI.
+This guide walks through creating every Azure resource Scout needs, connecting them together, and running the app locally and in production.
+
+**Time to complete:** ~45 minutes for a fresh setup.
 
 ---
 
 ## Table of Contents
 
 1. [Prerequisites](#1-prerequisites)
-2. [Get the Code](#2-get-the-code)
-3. [Configure Your API Key](#3-configure-your-api-key)
-4. [Run Locally](#4-run-locally)
-5. [Deploy to GitHub Pages](#5-deploy-to-github-pages)
-6. [Switch to Azure OpenAI](#6-switch-to-azure-openai)
-7. [Project Structure](#7-project-structure)
-8. [Updating the App](#8-updating-the-app)
-9. [Troubleshooting](#9-troubleshooting)
+2. [Create an Azure Static Web App](#2-create-an-azure-static-web-app)
+3. [Create Azure OpenAI](#3-create-azure-openai)
+4. [Create Azure Maps](#4-create-azure-maps)
+5. [Create Bing Search](#5-create-bing-search)
+6. [Configure the Function App](#6-configure-the-function-app)
+7. [Add the GitHub Secret](#7-add-the-github-secret)
+8. [Set the Map Key for Local Dev](#8-set-the-map-key-for-local-dev)
+9. [Run Locally](#9-run-locally)
+10. [Deploy](#10-deploy)
+11. [Project Structure](#11-project-structure)
+12. [Troubleshooting](#12-troubleshooting)
 
 ---
 
 ## 1. Prerequisites
 
-Install these tools before starting. Each link goes to the official download page.
+### Required tools
 
-| Tool | Version | Why |
+| Tool | Why | Get it |
 |---|---|---|
-| [Node.js](https://nodejs.org/) | 18 or higher | Runs the build toolchain |
-| [Git](https://git-scm.com/) | Any recent | Version control |
-| A GitHub account | — | Hosts the deployed app |
-| An Anthropic API key (or Azure OpenAI) | — | Powers the AI research |
+| Node.js 20+ | Build toolchain | [nodejs.org](https://nodejs.org) |
+| Azure Functions Core Tools v4 | Run Functions locally | [docs.microsoft.com/azure/azure-functions/functions-run-local](https://docs.microsoft.com/azure/azure-functions/functions-run-local) |
+| SWA CLI | Run React + Functions together locally | `npm install -g @azure/static-web-apps-cli` |
+| Git | Version control | [git-scm.com](https://git-scm.com) |
 
-To check if Node and Git are already installed, open a terminal and run:
+### Required VS Code extensions
 
-```bash
-node --version
-git --version
-```
+Open VS Code, press `Ctrl+Shift+X`, and install:
 
-Both should print a version number. If either says "command not found", install that tool first.
+- **Azure Static Web Apps** (`ms-azuretools.vscode-azurestaticwebapps`)
+- **Azure Functions** (`ms-azuretools.vscode-azurefunctions`)
+- **Azure Account** (`ms-vscode.azure-account`) — sign in to your Azure tenant
 
----
+After installing, sign in: press `Ctrl+Shift+P` → **Azure: Sign In** → complete the browser flow.
 
-## 2. Get the Code
+### Azure subscription
 
-### Option A — You're setting this up fresh from the files provided
-
-Create a new folder, copy all the project files into it, and continue to step 3.
-
-### Option B — Cloning from a GitHub repository (after initial push)
-
-```bash
-git clone https://github.com/YOUR-USERNAME/scout-territory.git
-cd scout-territory
-npm install
-```
-
-### Option C — Starting from scratch and pushing to a new repo
-
-1. Create a new repository on GitHub. Name it `scout-territory` (or anything you like). Set it to **Private** so your API secrets are not publicly visible in Action logs.
-
-2. In your terminal, inside the project folder:
-
-```bash
-git init
-git add .
-git commit -m "Initial Scout commit"
-git branch -M main
-git remote add origin https://github.com/YOUR-USERNAME/scout-territory.git
-git push -u origin main
-```
+You need a subscription with permission to create resources. If you're working in an org tenant, confirm you have **Contributor** access on at least one resource group, or ask your Azure admin to create the resources and share the keys with you.
 
 ---
 
-## 3. Configure Your API Key
+## 2. Create an Azure Static Web App
 
-### For local development
+This creates the hosting environment for the React app *and* the Azure Functions backend in one resource. It also automatically sets up your GitHub Actions deployment pipeline.
 
-1. In the project root, copy the example env file:
+### In VS Code
+
+1. Open the **Azure** panel in the Activity Bar (the Azure icon on the left).
+2. Expand your subscription, right-click **Static Web Apps**, and select **Create Static Web App (Advanced)**.
+3. Fill in the prompts:
+
+   | Prompt | Value |
+   |---|---|
+   | Resource group | Create new, e.g. `scout-rg` |
+   | Name | `scout-app` (or any name) |
+   | Region | Pick the region closest to your users |
+   | SKU | **Standard** (required for custom auth + managed Functions) |
+   | Framework | **React** |
+   | App location | `/` |
+   | Build output | `build` |
+   | API location | `api` |
+
+4. VS Code will ask to authorize GitHub access if you haven't already. Allow it.
+5. It creates the resource and automatically:
+   - Adds a **deployment token** to your GitHub repository as `AZURE_STATIC_WEB_APPS_API_TOKEN`
+   - Creates a GitHub Actions workflow file (you already have `.github/workflows/azure-static-web-apps.yml` — VS Code may detect the conflict; keep yours)
+
+### Get the resource name for later
+
+After creation, note the **resource URL** shown in VS Code (e.g., `https://purple-pebble-123.azurestaticapps.net`). This is your production URL.
+
+---
+
+## 3. Create Azure OpenAI
+
+### Option A — You already have an Azure OpenAI resource
+
+Skip to **Get the endpoint and key** below.
+
+### Option B — Create a new resource
+
+1. Go to [portal.azure.com](https://portal.azure.com).
+2. Search for **Azure OpenAI** in the top search bar and click it.
+3. Click **+ Create**.
+4. Fill in:
+
+   | Field | Value |
+   |---|---|
+   | Subscription | Your subscription |
+   | Resource group | `scout-rg` (same as above) |
+   | Region | `East US` or `East US 2` (best model availability) |
+   | Name | `scout-openai` |
+   | Pricing tier | Standard S0 |
+
+5. Click **Review + Create**, then **Create**. Wait for deployment (~2 minutes).
+
+### Deploy a model
+
+1. Once the resource is created, click **Go to resource**.
+2. Click **Model deployments** in the left sidebar, then **Manage deployments** (opens Azure OpenAI Studio).
+3. Click **+ New deployment**.
+4. Select:
+
+   | Field | Value |
+   |---|---|
+   | Model | `gpt-4o` |
+   | Deployment name | `gpt-4o-scout` |
+   | Version | Latest available |
+   | Tokens per minute | 100K (adjust based on your usage) |
+
+5. Click **Create**.
+
+### Get the endpoint and key
+
+1. Back in the Azure portal on your OpenAI resource, click **Keys and Endpoint** in the left sidebar.
+2. Copy **Key 1** and the **Endpoint** URL.
+3. Build the full endpoint for the Function by appending the deployment path:
+
+   ```
+   https://YOUR-RESOURCE.openai.azure.com/openai/deployments/gpt-4o-scout/chat/completions?api-version=2024-08-01-preview
+   ```
+
+   Keep both the endpoint URL and key — you'll need them in Step 6.
+
+---
+
+## 4. Create Azure Maps
+
+### Create the resource
+
+1. In the Azure portal, search for **Azure Maps** and click it.
+2. Click **+ Create**.
+3. Fill in:
+
+   | Field | Value |
+   |---|---|
+   | Subscription | Your subscription |
+   | Resource group | `scout-rg` |
+   | Name | `scout-maps` |
+   | Pricing tier | **Gen2 (Maps and Location Insights)** |
+
+4. Click **Review + Create**, then **Create**.
+
+### Get the key
+
+1. Go to the resource once deployed.
+2. Click **Authentication** in the left sidebar.
+3. Copy **Primary Key**. You'll use this in two places:
+   - As `AZURE_MAPS_KEY` in the Function App (server-side, for geocoding and POI search)
+   - As `REACT_APP_AZURE_MAPS_KEY` in your local `.env` (client-side, for map tile rendering only)
+
+### Restrict the client-side key (important)
+
+The map tile key is exposed in the browser bundle. To limit damage if it's ever scraped:
+
+1. In the portal on your Maps resource, click **Authentication**.
+2. Under **Shared Key Authentication**, click the settings icon next to Primary Key.
+3. Add a **URL restriction** for your production domain:
+   ```
+   https://purple-pebble-123.azurestaticapps.net
+   ```
+4. Add `http://localhost:3000` for local development.
+
+This means the key only works when the request originates from those domains.
+
+---
+
+## 5. Create Bing Search
+
+Bing Search is part of Azure AI Services.
+
+1. In the Azure portal, search for **Bing Search v7** and click it.
+   - If it doesn't appear, search for **Bing Resources** and look for **Bing Search**.
+2. Click **+ Create**.
+3. Fill in:
+
+   | Field | Value |
+   |---|---|
+   | Subscription | Your subscription |
+   | Resource group | `scout-rg` |
+   | Name | `scout-bing` |
+   | Pricing tier | **S1** (3 calls/second, 1000/month free, then pay-per-use) |
+
+4. Click **Review + Create**, then **Create**.
+
+### Get the key
+
+1. Go to the resource once deployed.
+2. Click **Keys and Endpoint** in the left sidebar.
+3. Copy **Key 1**. Keep this for Step 6.
+
+> **Note:** Bing Search resources are sometimes listed under **AI + Machine Learning** in the Marketplace. If you can't find "Bing Search v7", search for "Bing" and look for the Bing Search tile (not Bing Maps or Bing Autosuggest).
+
+---
+
+## 6. Configure the Function App
+
+The Azure Static Web App created in Step 2 automatically provisions a managed Function App. You need to add the four API keys as application settings so the Functions can read them at runtime.
+
+### Via VS Code (easiest)
+
+1. In the **Azure** panel, expand your subscription → **Static Web Apps** → `scout-app`.
+2. Right-click the resource and select **Open in Portal** to find the associated Function App.
+3. Alternatively, expand **Static Web Apps** → `scout-app` → **Functions** to see the deployed functions once the first deployment runs.
+
+The cleanest approach for setting variables is directly in the portal:
+
+1. In the Azure portal, search for **Function App** and find the auto-generated one (it will have a name like `scout-app-api` or a random suffix).
+2. Click **Configuration** in the left sidebar.
+3. Under **Application settings**, click **+ New application setting** for each of the following:
+
+   | Name | Value |
+   |---|---|
+   | `AZURE_OPENAI_ENDPOINT` | Full endpoint URL from Step 3 (includes deployment name and api-version) |
+   | `AZURE_OPENAI_KEY` | Key 1 from Step 3 |
+   | `AZURE_MAPS_KEY` | Primary Key from Step 4 |
+   | `BING_SEARCH_KEY` | Key 1 from Step 5 |
+
+4. Click **Save** at the top. The Function App restarts.
+
+### Via VS Code (alternative)
+
+If you have the Azure Functions extension installed and are signed in:
+
+1. Create a file `api/local.settings.json` (already in `.gitignore`):
+
+   ```json
+   {
+     "IsEncrypted": false,
+     "Values": {
+       "AzureWebJobsStorage": "",
+       "FUNCTIONS_WORKER_RUNTIME": "node",
+       "AZURE_OPENAI_ENDPOINT": "https://YOUR-RESOURCE.openai.azure.com/openai/deployments/gpt-4o-scout/chat/completions?api-version=2024-08-01-preview",
+       "AZURE_OPENAI_KEY": "your-openai-key",
+       "AZURE_MAPS_KEY": "your-maps-key",
+       "BING_SEARCH_KEY": "your-bing-key"
+     }
+   }
+   ```
+
+2. In VS Code, right-click the Function App in the Azure panel → **Upload Local Settings**. This pushes everything from `local.settings.json` to the deployed Function App's application settings.
+
+---
+
+## 7. Add the GitHub Secret
+
+The GitHub Actions workflow needs one secret to authenticate deployments to Azure Static Web Apps.
+
+VS Code usually adds this automatically when you create the SWA resource (Step 2). Verify it exists:
+
+1. Go to your GitHub repository.
+2. Click **Settings** → **Secrets and variables** → **Actions**.
+3. You should see `AZURE_STATIC_WEB_APPS_API_TOKEN` in the list.
+
+**If it's missing:**
+
+1. In the Azure portal, go to your Static Web App resource.
+2. Click **Manage deployment token** in the Overview section.
+3. Copy the token.
+4. In GitHub, click **New repository secret**, name it `AZURE_STATIC_WEB_APPS_API_TOKEN`, and paste the token.
+
+---
+
+## 8. Set the Map Key for Local Dev
+
+The map tile rendering (the actual map display in the Route Planner) requires the Azure Maps key in the React app's environment. This is the only key that goes in `.env` — everything else stays in `local.settings.json`.
+
+Create a `.env` file in the project root (copy from the example):
 
 ```bash
 cp .env.example .env
 ```
 
-2. Open `.env` in any text editor and paste in your Anthropic API key:
+Edit `.env`:
 
 ```
-REACT_APP_USE_AZURE=false
-REACT_APP_ANTHROPIC_API_KEY=sk-ant-api03-...your-real-key...
+REACT_APP_AZURE_MAPS_KEY=your-azure-maps-primary-key
 ```
 
-3. Save the file. **Never commit `.env` to Git.** It is already listed in `.gitignore`.
+This key is used only to load map tiles in the browser. All data calls (geocoding, POI search) still go through the Function at `/api/places`.
 
-### Getting an Anthropic API key
-
-1. Go to [console.anthropic.com](https://console.anthropic.com)
-2. Sign in or create an account
-3. Click **API Keys** in the left nav
-4. Click **Create Key**, give it a name like "Scout App"
-5. Copy the key immediately — it won't be shown again
-
-Note: Anthropic API usage is billed per token. Territory research calls typically cost less than $0.01 each using claude-sonnet. You can set a monthly spend limit in the console under **Billing**.
+> `.env` is in `.gitignore` and will never be committed.
 
 ---
 
-## 4. Run Locally
+## 9. Run Locally
+
+Local development uses the SWA CLI to run the React dev server and Azure Functions together, mirroring the production setup.
+
+### First time setup
 
 ```bash
-npm install       # first time only
+# Install dependencies for the React app
+npm install
+
+# Install dependencies for the Functions
+cd api && npm install && cd ..
+```
+
+### Start the dev server
+
+```bash
+swa start http://localhost:3000 --api-location api --run "npm start"
+```
+
+This command:
+- Starts the React dev server on port 3000
+- Starts the Functions runtime on port 7071
+- Proxies everything through port 4280 (the SWA emulator)
+- Routes `/api/*` requests to the local Functions automatically
+
+Open `http://localhost:4280` in your browser.
+
+### Alternative: run React and Functions separately
+
+If you prefer two terminals:
+
+**Terminal 1 — React:**
+```bash
 npm start
 ```
 
-The app opens at `http://localhost:3000`. Changes to source files hot-reload automatically.
+**Terminal 2 — Functions:**
+```bash
+cd api
+npm install   # first time only
+func start
+```
 
-To build a production bundle without deploying:
+Then open `http://localhost:3000`. API calls to `/api/*` will proxy to the Functions running on port 7071 (React's dev server is configured to proxy these automatically via `package.json`'s `proxy` field — add `"proxy": "http://localhost:7071"` if you use this method).
+
+### Verify everything is working
+
+With the app running, try a territory search. The browser network tab should show:
+- `POST /api/scout` → 200
+- `POST /api/places` → 200
+- `POST /api/search` → 200
+
+If any of these return 500, check `api/local.settings.json` and confirm the keys are set correctly.
+
+---
+
+## 10. Deploy
+
+### Automatic deployment
+
+Every push to `main` triggers the GitHub Actions workflow, which:
+1. Builds the React app
+2. Packages the Functions
+3. Deploys both to Azure Static Web Apps
 
 ```bash
-npm run build
+git add .
+git commit -m "Your message"
+git push origin main
 ```
 
-This creates a `build/` folder with the optimized static files.
+Monitor progress in the **Actions** tab of your GitHub repository. Deployment typically takes 3-5 minutes.
+
+### Manual deployment via VS Code
+
+1. In the Azure panel, right-click your Static Web App → **Deploy to Static Web App**.
+2. Select the `build` folder as the output.
+
+> Note: This deploys only the frontend. The Functions are always deployed via GitHub Actions when the `api/` folder changes.
 
 ---
 
-## 5. Deploy to GitHub Pages
-
-GitHub Pages serves the built app for free from your repository. The included GitHub Actions workflow handles the build and deploy automatically every time you push to `main`.
-
-### Step 1 — Add your API key as a GitHub Secret
-
-Secrets are encrypted and injected at build time. They are never visible in logs or the deployed files.
-
-1. Go to your repository on GitHub
-2. Click **Settings** (top nav)
-3. In the left sidebar, click **Secrets and variables** then **Actions**
-4. Click **New repository secret**
-5. Add the following secrets one at a time:
-
-| Secret Name | Value |
-|---|---|
-| `REACT_APP_USE_AZURE` | `false` |
-| `REACT_APP_ANTHROPIC_API_KEY` | Your Anthropic API key |
-
-If using Azure instead (see Section 6), add those secrets instead.
-
-### Step 2 — Enable GitHub Pages
-
-1. In your repository, click **Settings**
-2. Scroll down to **Pages** in the left sidebar
-3. Under **Source**, select **GitHub Actions**
-4. Click **Save**
-
-### Step 3 — Trigger the first deployment
-
-The workflow runs automatically on every push to `main`. To trigger it manually:
-
-1. Go to the **Actions** tab in your repository
-2. Click **Deploy Scout to GitHub Pages** in the left sidebar
-3. Click **Run workflow** then **Run workflow** again
-
-### Step 4 — Find your live URL
-
-After the workflow completes (usually 2-3 minutes):
-
-1. Go to **Settings** > **Pages**
-2. Your live URL is displayed at the top, in the format:
-
-```
-https://YOUR-USERNAME.github.io/scout-territory/
-```
-
-Share this URL with your team. No login required (consider adding auth if this needs to be restricted — see Section 9).
-
-### Subsequent deploys
-
-After the initial setup, deploying is automatic. Any time you push code changes to `main`, the workflow runs and the live site updates within a few minutes.
-
----
-
-## 6. Switch to Azure OpenAI
-
-When you're ready to move from Anthropic to your org's Azure OpenAI deployment, the change is entirely in configuration. No code changes needed.
-
-### What you need from Azure
-
-You'll need three things from your Azure portal:
-
-1. **Endpoint URL** — Found in Azure OpenAI Studio under your deployment. Looks like:
-   `https://YOUR-RESOURCE.openai.azure.com/openai/deployments/YOUR-DEPLOYMENT/chat/completions?api-version=2024-02-01`
-
-2. **API Key** — Found in Azure portal under your OpenAI resource > **Keys and Endpoint**
-
-3. **Model deployment name** — The name you gave your GPT-4o deployment (e.g., `gpt-4o-scout`)
-
-### Update your local `.env`
-
-```
-REACT_APP_USE_AZURE=true
-REACT_APP_AZURE_OPENAI_ENDPOINT=https://YOUR-RESOURCE.openai.azure.com/openai/deployments/YOUR-DEPLOYMENT/chat/completions?api-version=2024-02-01
-REACT_APP_AZURE_OPENAI_KEY=your-azure-key-here
-```
-
-Comment out or remove the Anthropic key lines.
-
-### Update GitHub Secrets
-
-In your repository Settings > Secrets > Actions, update or add:
-
-| Secret Name | Value |
-|---|---|
-| `REACT_APP_USE_AZURE` | `true` |
-| `REACT_APP_AZURE_OPENAI_ENDPOINT` | Your full Azure endpoint URL |
-| `REACT_APP_AZURE_OPENAI_KEY` | Your Azure API key |
-
-You can leave the Anthropic secret in place — it just won't be used when `USE_AZURE=true`.
-
-Push any change to `main` (even a blank line in README) to trigger a redeploy with the new config.
-
----
-
-## 7. Project Structure
+## 11. Project Structure
 
 ```
 scout-territory/
-├── .github/
-│   └── workflows/
-│       └── deploy.yml          # Auto-deploy to GitHub Pages on push
-├── public/
-│   └── index.html              # HTML shell
-├── src/
+├── api/                              ← Azure Functions (backend)
+│   ├── src/functions/
+│   │   ├── scout.js                  ← Azure OpenAI proxy
+│   │   ├── places.js                 ← Azure Maps proxy (geocode + POI + routing)
+│   │   └── search.js                 ← Bing Search proxy
+│   ├── host.json
+│   ├── local.settings.json           ← Local env vars (never committed)
+│   └── package.json
+│
+├── src/                              ← React app
+│   ├── views/
+│   │   ├── TerritoryView.jsx         ← Module 1: Territory Research
+│   │   ├── RoutePlannerView.jsx      ← Module 2: Route Planner
+│   │   ├── CampaignView.jsx          ← Module 3: Campaign Generator
+│   │   ├── CallPrepView.jsx          ← Module 4: Call Prep Cards
+│   │   └── ActivityLogView.jsx       ← Module 5: Activity Log
 │   ├── components/
-│   │   ├── Badges.jsx          # Heat, Brand, and Job count badges
-│   │   ├── ProspectCard.jsx    # Individual prospect card with talking points
-│   │   ├── SearchPanel.jsx     # Location / radius / industry inputs
-│   │   ├── Spinner.jsx         # Loading animation
-│   │   └── SummaryBar.jsx      # Results summary + CSV export button
-│   ├── api.js                  # AI provider abstraction (Anthropic or Azure)
-│   ├── prompts.js              # All AI prompt templates
-│   ├── App.jsx                 # Main app logic and state
-│   ├── index.js                # React entry point
-│   └── index.css               # Tailwind + global styles
-├── .env.example                # Template for local env vars
-├── .gitignore
-├── package.json
-├── postcss.config.js
-├── tailwind.config.js
-└── SETUP.md                    # This file
+│   │   ├── NavBar.jsx                ← Tab navigation
+│   │   ├── ProspectCard.jsx          ← Territory research result card
+│   │   ├── CallPrepCard.jsx          ← Call prep accordion card
+│   │   ├── RouteMap.jsx              ← Azure Maps display
+│   │   ├── WeekSchedule.jsx          ← Drag-and-drop weekly schedule
+│   │   ├── SearchPanel.jsx           ← Territory search inputs
+│   │   ├── SummaryBar.jsx            ← Results summary + export
+│   │   ├── Badges.jsx                ← Heat / Brand / Job badges
+│   │   └── Spinner.jsx               ← Loading state
+│   ├── api.js                        ← Calls /api/scout
+│   ├── placesApi.js                  ← Calls /api/places
+│   ├── searchApi.js                  ← Calls /api/search
+│   ├── prompts.js                    ← All AI prompt templates
+│   ├── storage.js                    ← IndexedDB (local persistence)
+│   ├── utils/icalExport.js           ← .ics calendar file generator
+│   └── App.jsx                       ← Tab routing + cross-module state
+│
+├── .env                              ← Local only: REACT_APP_AZURE_MAPS_KEY
+├── .env.example                      ← Template (committed)
+├── staticwebapp.config.json          ← SWA routing config
+└── SETUP.md                          ← This file
 ```
 
-### Key files to know
-
-**`src/prompts.js`** — Edit this to change what Scout researches or how it describes prospects. This is where you'd update the system prompt to add new fields, change the tone of talking points, or add new industries.
-
-**`src/api.js`** — The AI provider switch lives here. You generally won't need to edit this.
-
-**`src/components/ProspectCard.jsx`** — Controls what data shows on each card. If the AI returns new fields, add them here.
-
 ---
 
-## 8. Updating the App
+## 12. Troubleshooting
 
-### To change the AI prompts or behavior
+### "Server error 500" on any API call
 
-1. Edit `src/prompts.js`
-2. Test locally with `npm start`
-3. Commit and push to `main` — auto-deploys
+The Function App is missing an application setting. Check:
+1. Azure portal → Function App → Configuration → Application settings
+2. Confirm all four keys are present: `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_KEY`, `AZURE_MAPS_KEY`, `BING_SEARCH_KEY`
+3. After adding or changing settings, click **Save** and wait for the restart
 
-### To add a new field to prospect cards
+For local dev, check `api/local.settings.json`.
 
-1. Add the field to the JSON schema description in `src/prompts.js` (inside `TERRITORY_SYSTEM_PROMPT`)
-2. Display the field in `src/components/ProspectCard.jsx`
-3. Optionally add it to the CSV export in `src/App.jsx` inside `exportToCSV`
+### Functions don't start locally (`func start` fails)
 
-### To add the Route Planner module (Phase 2)
+Azure Functions Core Tools v4 must be installed:
 
-1. Create `src/components/RouteMap.jsx` using the Azure Maps React SDK
-2. Pass the `prospects` array (already has `location` fields) to the map component
-3. Add a tab or toggle in `App.jsx` to switch between Research and Route views
+```bash
+# macOS
+brew tap azure/functions && brew install azure-functions-core-tools@4
 
----
+# Windows (winget)
+winget install Microsoft.AzureFunctionsCoreTools
 
-## 9. Troubleshooting
+# npm (cross-platform)
+npm install -g azure-functions-core-tools@4 --unsafe-perm true
+```
 
-### "API key not configured" error in the app
+Verify with `func --version` — should print `4.x.x`.
 
-Your `.env` file is missing or the key name is wrong. Confirm:
-- The file is named exactly `.env` (not `.env.txt`)
-- The variable name is exactly `REACT_APP_ANTHROPIC_API_KEY`
-- You restarted `npm start` after editing `.env` (env changes require a restart)
+### Map doesn't display in Route Planner
 
-### GitHub Actions workflow fails at "Build app" step
+`REACT_APP_AZURE_MAPS_KEY` is not set in `.env`. The map component shows a clear message when the key is missing. Add the key and restart the dev server (`Ctrl+C` then `npm start` or `swa start ...`).
 
-Check the workflow logs in the **Actions** tab. Common causes:
+### Bing Search returns no results
 
-- **Secret not set**: Go to Settings > Secrets and confirm the secret name matches exactly (case-sensitive)
-- **Invalid API key**: The key value was pasted with extra spaces or line breaks
+Bing Search results may be empty in certain regions or for very specific queries — this is expected and handled gracefully (the territory search falls back to AI-only enrichment). Confirm the `BING_SEARCH_KEY` is set and the Bing Search resource is in **Active** state in the portal.
 
-### App deployed but shows blank white page
+### Deployment fails with "unauthorized"
 
-This is almost always a `PUBLIC_URL` path issue. Confirm your repository name matches what's in `deploy.yml`. The workflow sets `PUBLIC_URL` to `/${{ github.event.repository.name }}` automatically, so if your repo is named `scout-territory`, the app expects to be served from `/scout-territory/`.
+The `AZURE_STATIC_WEB_APPS_API_TOKEN` GitHub secret is expired or missing. Regenerate it:
+1. Azure portal → your Static Web App → **Manage deployment token** → **Regenerate**
+2. Copy the new token
+3. GitHub → Settings → Secrets → update `AZURE_STATIC_WEB_APPS_API_TOKEN`
 
-If you renamed the repo, re-run the workflow from the Actions tab.
+### Azure OpenAI returns "model not found" or 404
 
-### Responses look wrong or garbled
+The endpoint URL in `AZURE_OPENAI_ENDPOINT` must include the exact deployment name you created in Step 3. Double-check:
 
-The AI returned something that couldn't be parsed as JSON. This is rare but can happen. The app will show an error message. Try the search again — if it fails consistently for a specific query, check `src/prompts.js` and make sure the system prompt still ends with the instruction to return only JSON.
+```
+https://YOUR-RESOURCE.openai.azure.com/openai/deployments/YOUR-DEPLOYMENT-NAME/chat/completions?api-version=2024-08-01-preview
+```
 
-### Want to restrict access to specific users
+The deployment name (e.g., `gpt-4o-scout`) is case-sensitive and must match exactly what's in Azure OpenAI Studio.
 
-GitHub Pages is public by default. Options for adding authentication:
+### Activity Log coaching nudges never appear
 
-- **GitHub Pages + Cloudflare Access**: Free, uses Google/Microsoft SSO, sits in front of the Pages URL
-- **Move to Azure Static Web Apps**: Supports Azure AD authentication natively, which would tie into Employbridge's existing org login
-- **Password protect with a simple JS gate**: Minimal security but quick to implement if needed temporarily
+Coaching nudges are only generated when there are logged activities in the last 30 days. Log a few visits or calls first, then navigate away from the Activity tab and back — this re-triggers the nudge generation.
 
----
-
-## Notes on API Key Security
-
-This app calls the AI API directly from the user's browser. This means the API key is embedded in the built JavaScript files and is technically visible to anyone who inspects the page source.
-
-**Acceptable for now because:**
-- The app is used internally by trusted employees
-- Anthropic keys can be rate-limited and spend-capped in the console
-- The key only has access to make AI completions (no data, no admin)
-
-**For a more locked-down future deployment:**
-- Route API calls through an Azure Function that holds the key server-side
-- Or migrate hosting to Azure Static Web Apps with Azure AD auth + a Function backend
-
-This is already architected for that upgrade — the `api.js` file just needs its `fetch` target changed from the AI provider directly to your Azure Function URL.
+Nudges are also cached for 24 hours in `localStorage`. To force a refresh during testing:
+```javascript
+// Paste in browser DevTools console
+localStorage.removeItem('scout_coaching_nudges');
+```
+Then reload the page.

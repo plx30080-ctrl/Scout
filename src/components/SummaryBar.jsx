@@ -1,12 +1,13 @@
 // components/SummaryBar.jsx
 
-export default function SummaryBar({ prospects, selectedCount, dismissedCount, onExport }) {
+export default function SummaryBar({ prospects, selectedCount, dismissedCount, onExport, usedMaps }) {
   const hot = prospects.filter((p) => p.heatScore === 'Hot').length;
   const warm = prospects.filter((p) => p.heatScore === 'Warm').length;
   const totalRoles = prospects.reduce((sum, p) => sum + (p.openRoles || 0), 0);
 
   return (
-    <div className="flex items-center justify-between gap-4 px-5 py-3.5 bg-slate-800/50 border border-slate-700/60 rounded-xl flex-wrap gap-y-3">
+    <div className="rounded-xl border border-slate-700/60 bg-slate-800/50 overflow-hidden">
+    <div className="flex items-center justify-between gap-4 px-5 py-3.5 flex-wrap gap-y-3">
       <div className="flex items-center gap-4 text-sm flex-wrap gap-y-2">
         <span className="text-slate-400 font-medium">{prospects.length} prospects</span>
         <span className="text-slate-700 hidden sm:inline">|</span>
@@ -34,6 +35,17 @@ export default function SummaryBar({ prospects, selectedCount, dismissedCount, o
         </svg>
         {selectedCount > 0 ? `Export ${selectedCount} selected` : `Export all (${prospects.length})`}
       </button>
+    </div>
+    {usedMaps && (
+      <div className="px-5 py-2 border-t border-slate-700/40 flex items-center gap-1.5">
+        <svg viewBox="0 0 24 24" className="w-3 h-3 shrink-0" fill="none">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="#34A853"/>
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13V2z" fill="#4285F4"/>
+          <circle cx="12" cy="9" r="2.5" fill="white"/>
+        </svg>
+        <span className="text-[10px] text-slate-600">Business locations sourced from Azure Maps · Intelligence from Bing Search</span>
+      </div>
+    )}
     </div>
   );
 }

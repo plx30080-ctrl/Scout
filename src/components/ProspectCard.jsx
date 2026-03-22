@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { HeatBadge, BrandBadge, JobBadge } from './Badges';
 
-export default function ProspectCard({ company, index, isSelected, onToggleSelect, onDismiss, onPrepForCall }) {
+export default function ProspectCard({ company, index, isSelected, onToggleSelect, onDismiss, onPrepForCall, onGenerateCampaign }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -28,7 +28,16 @@ export default function ProspectCard({ company, index, isSelected, onToggleSelec
               <span className="text-slate-700">·</span>
               <span>{company.estimatedSize}</span>
               <span className="text-slate-700">·</span>
-              <span>{company.address || company.location}</span>
+              <a
+                href={`https://www.google.com/search?q=${encodeURIComponent(`${company.name} ${company.address || company.location}`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Verify on Google"
+                className="hover:text-emerald-400 transition-colors underline decoration-dotted underline-offset-2"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {company.address || company.location}
+              </a>
             </div>
           </div>
 
@@ -98,15 +107,23 @@ export default function ProspectCard({ company, index, isSelected, onToggleSelec
           {expanded ? 'Hide details' : 'View talking points & open roles'}
         </button>
         {onPrepForCall && (
-          <button
-            onClick={() => onPrepForCall(company)}
-            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-violet-400 transition-colors"
-          >
+          <button onClick={() => onPrepForCall(company)}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-violet-400 transition-colors">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
             </svg>
             Prep for call
+          </button>
+        )}
+        {onGenerateCampaign && (
+          <button onClick={() => onGenerateCampaign(company)}
+            className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-sky-400 transition-colors">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Generate campaign
           </button>
         )}
         </div>

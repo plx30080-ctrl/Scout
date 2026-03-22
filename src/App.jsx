@@ -9,11 +9,17 @@ import ActivityLogView from './views/ActivityLogView';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('territory');
-  const [callPrepPrefill, setCallPrepPrefill] = useState(null);
+  const [callPrepPrefill,  setCallPrepPrefill]  = useState(null);
+  const [campaignPrefill, setCampaignPrefill] = useState(null);
 
   function handlePrepForCall(company) {
     setCallPrepPrefill(company);
     setActiveTab('callprep');
+  }
+
+  function handleGenerateCampaign(company) {
+    setCampaignPrefill(company);
+    setActiveTab('campaign');
   }
 
   return (
@@ -51,9 +57,14 @@ export default function App() {
 
       {/* Active view */}
       <main className="max-w-3xl mx-auto px-5 py-8">
-        {activeTab === 'territory' && <TerritoryView onPrepForCall={handlePrepForCall} />}
+        {activeTab === 'territory' && <TerritoryView onPrepForCall={handlePrepForCall} onGenerateCampaign={handleGenerateCampaign} />}
         {activeTab === 'routes'    && <RoutePlannerView />}
-        {activeTab === 'campaign'  && <CampaignView />}
+        {activeTab === 'campaign'  && (
+          <CampaignView
+            prefill={campaignPrefill}
+            onClearPrefill={() => setCampaignPrefill(null)}
+          />
+        )}
         {activeTab === 'callprep'  && (
           <CallPrepView
             prefill={callPrepPrefill}

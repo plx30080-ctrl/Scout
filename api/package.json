@@ -1,0 +1,16 @@
+{
+  "name": "scout-api",
+  "version": "1.0.0",
+  "description": "Scout backend API — Azure Functions proxy for OpenAI, Azure Maps, and Bing Search",
+  "main": "src/functions/*.js",
+  "scripts": {
+    "start": "func start",
+    "build": "echo 'No build step required'"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

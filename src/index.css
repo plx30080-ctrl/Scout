@@ -2,6 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Azure Maps */
+@import 'azure-maps-control/dist/atlas.min.css';
+
 :root {
   --font-main: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'DM Mono', monospace;
