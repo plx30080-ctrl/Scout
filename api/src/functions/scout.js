@@ -9,12 +9,15 @@ app.http('scout', {
   authLevel: 'anonymous',
   route: 'scout',
   handler: async (request, context) => {
-    const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
-    const key      = process.env.AZURE_OPENAI_KEY;
+    const baseEndpoint = process.env.AZURE_OPENAI_ENDPOINT; // e.g. https://my-resource.openai.azure.com
+    const key          = process.env.AZURE_OPENAI_KEY;
+    const deployment   = process.env.AZURE_OPENAI_DEPLOYMENT || 'Azure-Scout';
 
-    if (!endpoint || !key) {
+    if (!baseEndpoint || !key) {
       return { status: 500, jsonBody: { error: 'Azure OpenAI is not configured on the server.' } };
     }
+
+    const endpoint = `${baseEndpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=2024-08-01-preview`;
 
     let body;
     try {

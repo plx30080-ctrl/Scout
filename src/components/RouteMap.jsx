@@ -10,13 +10,12 @@ const STOP_COLORS = { prospect: '#10b981', client: '#3b82f6' };
 export default function RouteMap({ stops, onStopClick }) {
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
-  const dataRef      = useRef(null);
 
   useEffect(() => {
     if (!MAPS_KEY || !containerRef.current) return;
 
     // Lazy-load Azure Maps SDK to avoid SSR issues
-    import('azure-maps-control').then(({ Map, data, layer, source, HtmlMarker, Popup }) => {
+    import('azure-maps-control').then(({ Map, data, HtmlMarker }) => {
       if (mapRef.current) return; // already initialized
 
       const map = new Map(containerRef.current, {

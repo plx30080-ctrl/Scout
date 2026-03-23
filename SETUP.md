@@ -13,7 +13,7 @@ This guide walks through creating every Azure resource Scout needs, connecting t
 3. [Create Azure OpenAI](#3-create-azure-openai)
 4. [Create Azure Maps](#4-create-azure-maps)
 5. [Create Bing Search](#5-create-bing-search)
-6. [Configure the Function App](#6-configure-the-function-app)
+6. [Configure API Keys on the Static Web App](#6-configure-api-keys-on-the-static-web-app)
 7. [Add the GitHub Secret](#7-add-the-github-secret)
 8. [Set the Map Key for Local Dev](#8-set-the-map-key-for-local-dev)
 9. [Run Locally](#9-run-locally)
@@ -157,7 +157,7 @@ Skip to **Get the endpoint and key** below.
 1. Go to the resource once deployed.
 2. Click **Authentication** in the left sidebar.
 3. Copy **Primary Key**. You'll use this in two places:
-   - As `AZURE_MAPS_KEY` in the Function App (server-side, for geocoding and POI search)
+   - As `AZURE_MAPS_KEY` in the Static Web App configuration (server-side, for geocoding and POI search)
    - As `REACT_APP_AZURE_MAPS_KEY` in your local `.env` (client-side, for map tile rendering only)
 
 ### Restrict the client-side key (important)
@@ -204,36 +204,29 @@ Bing Search is part of Azure AI Services.
 
 ---
 
-## 6. Configure the Function App
+## 6. Configure API Keys on the Static Web App
 
-The Azure Static Web App created in Step 2 automatically provisions a managed Function App. You need to add the four API keys as application settings so the Functions can read them at runtime.
+Azure Static Web Apps has **built-in managed Functions** — no separate Function App resource is created. The API code in the `api/` folder is deployed automatically alongside the front end. Environment variables are set directly on the Static Web App resource.
 
-### Via VS Code (easiest)
+### Via the Azure Portal (recommended)
 
-1. In the **Azure** panel, expand your subscription → **Static Web Apps** → `scout-app`.
-2. Right-click the resource and select **Open in Portal** to find the associated Function App.
-3. Alternatively, expand **Static Web Apps** → `scout-app` → **Functions** to see the deployed functions once the first deployment runs.
-
-The cleanest approach for setting variables is directly in the portal:
-
-1. In the Azure portal, search for **Function App** and find the auto-generated one (it will have a name like `scout-app-api` or a random suffix).
-2. Click **Configuration** in the left sidebar.
-3. Under **Application settings**, click **+ New application setting** for each of the following:
+1. In the Azure portal, open your **Static Web App** resource (`scout-app`).
+2. In the left sidebar, click **Configuration**.
+3. Under **Application settings**, click **+ Add** for each of the following:
 
    | Name | Value |
    |---|---|
-   | `AZURE_OPENAI_ENDPOINT` | Full endpoint URL from Step 3 (includes deployment name and api-version) |
+   | `AZURE_OPENAI_ENDPOINT` | Base endpoint from Step 3, e.g. `https://YOUR-RESOURCE.openai.azure.com` |
+   | `AZURE_OPENAI_DEPLOYMENT` | `Azure-Scout` |
    | `AZURE_OPENAI_KEY` | Key 1 from Step 3 |
    | `AZURE_MAPS_KEY` | Primary Key from Step 4 |
    | `BING_SEARCH_KEY` | Key 1 from Step 5 |
 
-4. Click **Save** at the top. The Function App restarts.
+4. Click **Save**. The app restarts with the new settings.
 
-### Via VS Code (alternative)
+### Via VS Code
 
-If you have the Azure Functions extension installed and are signed in:
-
-1. Create a file `api/local.settings.json` (already in `.gitignore`):
+1. Create `api/local.settings.json` (already in `.gitignore`) for local development:
 
    ```json
    {
@@ -241,7 +234,8 @@ If you have the Azure Functions extension installed and are signed in:
      "Values": {
        "AzureWebJobsStorage": "",
        "FUNCTIONS_WORKER_RUNTIME": "node",
-       "AZURE_OPENAI_ENDPOINT": "https://YOUR-RESOURCE.openai.azure.com/openai/deployments/gpt-4o-scout/chat/completions?api-version=2024-08-01-preview",
+       "AZURE_OPENAI_ENDPOINT": "https://YOUR-RESOURCE.openai.azure.com",
+       "AZURE_OPENAI_DEPLOYMENT": "Azure-Scout",
        "AZURE_OPENAI_KEY": "your-openai-key",
        "AZURE_MAPS_KEY": "your-maps-key",
        "BING_SEARCH_KEY": "your-bing-key"
@@ -249,7 +243,9 @@ If you have the Azure Functions extension installed and are signed in:
    }
    ```
 
-2. In VS Code, right-click the Function App in the Azure panel → **Upload Local Settings**. This pushes everything from `local.settings.json` to the deployed Function App's application settings.
+   This file is used only for `swa start` local dev — it is never deployed.
+
+2. To push these settings to the deployed SWA, go to the portal as described above. (There is no VS Code shortcut to upload settings to a managed SWA Functions environment.)
 
 ---
 
@@ -427,9 +423,9 @@ scout-territory/
 
 ### "Server error 500" on any API call
 
-The Function App is missing an application setting. Check:
-1. Azure portal → Function App → Configuration → Application settings
-2. Confirm all four keys are present: `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_KEY`, `AZURE_MAPS_KEY`, `BING_SEARCH_KEY`
+The Static Web App is missing an application setting. Check:
+1. Azure portal → your Static Web App → **Configuration** → **Application settings**
+2. Confirm all five keys are present: `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_KEY`, `AZURE_MAPS_KEY`, `BING_SEARCH_KEY`
 3. After adding or changing settings, click **Save** and wait for the restart
 
 For local dev, check `api/local.settings.json`.
@@ -468,13 +464,14 @@ The `AZURE_STATIC_WEB_APPS_API_TOKEN` GitHub secret is expired or missing. Regen
 
 ### Azure OpenAI returns "model not found" or 404
 
-The endpoint URL in `AZURE_OPENAI_ENDPOINT` must include the exact deployment name you created in Step 3. Double-check:
+Check that `AZURE_OPENAI_ENDPOINT` is the **base URL only** (no path) and `AZURE_OPENAI_DEPLOYMENT` matches the name exactly as shown in Azure OpenAI Studio:
 
-```
-https://YOUR-RESOURCE.openai.azure.com/openai/deployments/YOUR-DEPLOYMENT-NAME/chat/completions?api-version=2024-08-01-preview
-```
+| Setting | Correct value |
+|---|---|
+| `AZURE_OPENAI_ENDPOINT` | `https://YOUR-RESOURCE.openai.azure.com` |
+| `AZURE_OPENAI_DEPLOYMENT` | `Azure-Scout` (case-sensitive) |
 
-The deployment name (e.g., `gpt-4o-scout`) is case-sensitive and must match exactly what's in Azure OpenAI Studio.
+The function constructs the full path automatically — do **not** include `/openai/deployments/...` in the endpoint value.
 
 ### Activity Log coaching nudges never appear
 
