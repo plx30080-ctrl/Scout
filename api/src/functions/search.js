@@ -40,8 +40,9 @@ app.http('search', {
     });
 
     if (!res.ok) {
-      context.error('Bing Search error:', res.status);
-      return { status: res.status, jsonBody: { error: `Bing Search error ${res.status}` } };
+      const errBody = await res.text().catch(() => '');
+      context.error('Bing Search error:', res.status, errBody);
+      return { status: res.status, jsonBody: { error: `Bing Search error ${res.status}`, detail: errBody } };
     }
 
     const data = await res.json();
