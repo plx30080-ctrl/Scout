@@ -20,7 +20,6 @@ const HEAT_FILTERS = ['All', 'Hot', 'Warm', 'Cold'];
 // Phase label shown under the search button during loading
 const PHASE_LABELS = {
   locating:  'Locating area...',
-  finding:   'Finding businesses near you...',
   searching: 'Gathering territory intelligence...',
   analyzing: 'Analyzing prospects with AI...',
 };
@@ -170,8 +169,8 @@ export default function TerritoryView({ isActive, onPrepForCall, onGenerateCampa
     } catch (err) {
       console.error(err);
       setError(
-        err.message.includes('API key')
-          ? 'API key not configured. Check your .env file and see SETUP.md.'
+        err.message.includes('not configured')
+          ? 'A backend API key is not configured. Check the application settings on your Static Web App (or api/local.settings.json for local dev) and see SETUP.md.'
           : `Search error: ${err.message}`
       );
     } finally {

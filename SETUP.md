@@ -30,7 +30,7 @@ This guide walks through creating every Azure resource Scout needs, connecting t
 | Tool | Why | Get it |
 |---|---|---|
 | Node.js 20+ | Build toolchain | [nodejs.org](https://nodejs.org) |
-| Azure Functions Core Tools v4 | Run Functions locally | [docs.microsoft.com/azure/azure-functions/functions-run-local](https://docs.microsoft.com/azure/azure-functions/functions-run-local) |
+| Azure Functions Core Tools v4 | Run Functions locally | [learn.microsoft.com/azure/azure-functions/functions-run-local](https://learn.microsoft.com/azure/azure-functions/functions-run-local) |
 | SWA CLI | Run React + Functions together locally | `npm install -g @azure/static-web-apps-cli` |
 | Git | Version control | [git-scm.com](https://git-scm.com) |
 
@@ -125,13 +125,13 @@ Skip to **Get the endpoint and key** below.
 
 1. Back in the Azure portal on your OpenAI resource, click **Keys and Endpoint** in the left sidebar.
 2. Copy **Key 1** and the **Endpoint** URL.
-3. Build the full endpoint for the Function by appending the deployment path:
+3. Use the endpoint value exactly as the base URL (do not append any path):
 
    ```
-   https://YOUR-RESOURCE.openai.azure.com/openai/deployments/gpt-4o-scout/chat/completions?api-version=2024-08-01-preview
+   https://YOUR-RESOURCE.openai.azure.com
    ```
 
-   Keep both the endpoint URL and key — you'll need them in Step 6.
+4. Keep both the endpoint URL and key — you'll need them in Step 6.
 
 ---
 
@@ -217,7 +217,7 @@ Azure Static Web Apps has **built-in managed Functions** — no separate Functio
    | Name | Value |
    |---|---|
    | `AZURE_OPENAI_ENDPOINT` | Base endpoint from Step 3, e.g. `https://YOUR-RESOURCE.openai.azure.com` |
-   | `AZURE_OPENAI_DEPLOYMENT` | `Azure-Scout` |
+   | `AZURE_OPENAI_DEPLOYMENT` | Your model deployment name from Azure OpenAI Studio (example: `gpt-4o-scout`) |
    | `AZURE_OPENAI_KEY` | Key 1 from Step 3 |
    | `AZURE_MAPS_KEY` | Primary Key from Step 4 |
    | `BING_SEARCH_KEY` | Key 1 from Step 5 |
@@ -226,7 +226,13 @@ Azure Static Web Apps has **built-in managed Functions** — no separate Functio
 
 ### Via VS Code
 
-1. Create `api/local.settings.json` (already in `.gitignore`) for local development:
+1. Copy `api/local.settings.example.json` to `api/local.settings.json` (already in `.gitignore`) and fill in your values:
+
+    ```bash
+    cp api/local.settings.example.json api/local.settings.json
+    ```
+
+2. Example file contents:
 
    ```json
    {
@@ -235,7 +241,7 @@ Azure Static Web Apps has **built-in managed Functions** — no separate Functio
        "AzureWebJobsStorage": "",
        "FUNCTIONS_WORKER_RUNTIME": "node",
        "AZURE_OPENAI_ENDPOINT": "https://YOUR-RESOURCE.openai.azure.com",
-       "AZURE_OPENAI_DEPLOYMENT": "Azure-Scout",
+       "AZURE_OPENAI_DEPLOYMENT": "gpt-4o-scout",
        "AZURE_OPENAI_KEY": "your-openai-key",
        "AZURE_MAPS_KEY": "your-maps-key",
        "BING_SEARCH_KEY": "your-bing-key"
@@ -245,7 +251,7 @@ Azure Static Web Apps has **built-in managed Functions** — no separate Functio
 
    This file is used only for `swa start` local dev — it is never deployed.
 
-2. To push these settings to the deployed SWA, go to the portal as described above. (There is no VS Code shortcut to upload settings to a managed SWA Functions environment.)
+3. To push these settings to the deployed SWA, go to the portal as described above. (There is no VS Code shortcut to upload settings to a managed SWA Functions environment.)
 
 ---
 
@@ -469,7 +475,7 @@ Check that `AZURE_OPENAI_ENDPOINT` is the **base URL only** (no path) and `AZURE
 | Setting | Correct value |
 |---|---|
 | `AZURE_OPENAI_ENDPOINT` | `https://YOUR-RESOURCE.openai.azure.com` |
-| `AZURE_OPENAI_DEPLOYMENT` | `Azure-Scout` (case-sensitive) |
+| `AZURE_OPENAI_DEPLOYMENT` | Your Azure OpenAI deployment name, for example `gpt-4o-scout` (case-sensitive) |
 
 The function constructs the full path automatically — do **not** include `/openai/deployments/...` in the endpoint value.
 
