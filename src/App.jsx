@@ -5,6 +5,7 @@ import TerritoryView from './views/TerritoryView';
 import RoutePlannerView from './views/RoutePlannerView';
 import CampaignView from './views/CampaignView';
 import CallPrepView from './views/CallPrepView';
+import ProspectDatabaseView from './views/ProspectDatabaseView';
 import ActivityLogView from './views/ActivityLogView';
 
 export default function App() {
@@ -70,6 +71,12 @@ export default function App() {
             onClearPrefill={() => setCampaignPrefill(null)}
           />
         </div>
+        {activeTab === 'accounts' && (
+          <ProspectDatabaseView
+            onPrepForCall={(p) => { setCallPrepPrefill({ companyName: p.companyName, address: p.address }); setActiveTab('callprep'); }}
+            onGenerateCampaign={(p) => { setCampaignPrefill({ companyName: p.companyName, industry: p.industry }); setActiveTab('campaign'); }}
+          />
+        )}
         {activeTab === 'callprep'  && (
           <CallPrepView
             prefill={callPrepPrefill}

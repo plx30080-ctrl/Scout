@@ -5,7 +5,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'scout-db';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 function getDB() {
   return openDB(DB_NAME, DB_VERSION, {
@@ -50,6 +50,14 @@ function getDB() {
       if (!db.objectStoreNames.contains('callPrepCards')) {
         const cards = db.createObjectStore('callPrepCards', { keyPath: 'prospectName' });
         cards.createIndex('by-timestamp', 'generatedAt');
+      }
+
+      // Prospect Database: full account records with contacts + notes
+      if (!db.objectStoreNames.contains('prospects')) {
+        const p = db.createObjectStore('prospects', { keyPath: 'id' });
+        p.createIndex('by-companyName', 'companyName');
+        p.createIndex('by-status', 'status');
+        p.createIndex('by-updatedAt', 'updatedAt');
       }
     },
   });
@@ -188,4 +196,43 @@ export async function getRecentCallPrepCards(limit = 20) {
   const db = await getDB();
   const all = await db.getAllFromIndex('callPrepCards', 'by-timestamp');
   return all.reverse().slice(0, limit);
+}
+
+// ─── Prospect Database ─────────────────────────────────────────────────────────
+// prospect: { id, companyName, address, industry, phone, website,
+//             status, heatScore, notes, contacts[], createdAt, updatedAt }
+// contact:  { id, name, title, phone, email, linkedin }
+
+function prospectId() {
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+export async function saveProspect(prospect) {
+  const db = await getDB();
+  const now = Date.now();
+  const record = { ...prospect, updatedAt: now };
+  if (!record.id) { record.id = prospectId(); record.createdAt = now; }
+  await db.put('prospects', record);
+  return record;
+}
+
+export async function getProspect(id) {
+  const db = await getDB();
+  return db.get('prospects', id);
+}
+
+export async function getAllProspects() {
+  const db = await getDB();
+  const all = await db.getAllFromIndex('prospects', 'by-updatedAt');
+  return all.reverse();
+}
+
+export async function deleteProspect(id) {
+  const db = await getDB();
+  return db.delete('prospects', id);
+}
+
+export async function getProspectByName(companyName) {
+  const db = await getDB();
+  return db.getFromIndex('prospects', 'by-companyName', companyName);
 }
