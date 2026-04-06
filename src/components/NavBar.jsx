@@ -58,7 +58,7 @@ const TABS = [
 export default function NavBar({ activeTab, setActiveTab }) {
   return (
     <nav className="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur-sm">
-      <div className="max-w-3xl mx-auto px-5">
+      <div className="max-w-6xl mx-auto px-6">
         <div className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
           {TABS.map((tab) => {
             const active = activeTab === tab.id;
