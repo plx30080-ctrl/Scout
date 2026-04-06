@@ -1,25 +1,36 @@
 // components/RouteMap.jsx
-// Azure Maps display for pinned stops. Requires REACT_APP_AZURE_MAPS_KEY
-// (used only for tile rendering — all data APIs go through /api/places).
-import { useEffect, useRef } from 'react';
-
-const MAPS_KEY = process.env.REACT_APP_AZURE_MAPS_KEY;
+// Azure Maps display for pinned stops.
+// Fetches the subscription key from /api/maps-config so it stays server-side.
+import { useEffect, useRef, useState } from 'react';
 
 const STOP_COLORS = { prospect: '#10b981', client: '#3b82f6' };
 
 export default function RouteMap({ stops, onStopClick }) {
   const containerRef = useRef(null);
   const mapRef       = useRef(null);
+  const [mapsKey, setMapsKey]   = useState(null);
+  const [keyError, setKeyError] = useState(null);
 
+  // Fetch the key once on mount
   useEffect(() => {
-    if (!MAPS_KEY || !containerRef.current) return;
+    fetch('/api/maps-config')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.key) setMapsKey(d.key);
+        else setKeyError(d.error || 'Azure Maps key not configured.');
+      })
+      .catch(() => setKeyError('Could not reach /api/maps-config.'));
+  }, []);
 
-    // Lazy-load Azure Maps SDK to avoid SSR issues
+  // Initialize map once we have the key and the container
+  useEffect(() => {
+    if (!mapsKey || !containerRef.current) return;
+
     import('azure-maps-control').then(({ Map, data, HtmlMarker }) => {
       if (mapRef.current) return; // already initialized
 
       const map = new Map(containerRef.current, {
-        authOptions: { authType: 'subscriptionKey', subscriptionKey: MAPS_KEY },
+        authOptions: { authType: 'subscriptionKey', subscriptionKey: mapsKey },
         style: 'night',
         zoom: 10,
         center: stops.length > 0 ? [stops[0].lng, stops[0].lat] : [-90.1, 38.7],
@@ -39,7 +50,7 @@ export default function RouteMap({ stops, onStopClick }) {
         mapRef.current = null;
       }
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [mapsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update markers when stops change
   useEffect(() => {
@@ -52,12 +63,20 @@ export default function RouteMap({ stops, onStopClick }) {
     });
   }, [stops, onStopClick]);
 
-  if (!MAPS_KEY) {
+  if (keyError) {
     return (
       <div className="rounded-xl border border-slate-700/60 bg-slate-800/30 h-64 flex items-center justify-center">
         <p className="text-sm text-slate-500 text-center px-6">
-          Map display requires <code className="text-slate-400">REACT_APP_AZURE_MAPS_KEY</code> in your environment.
+          Map unavailable: {keyError}
         </p>
+      </div>
+    );
+  }
+
+  if (!mapsKey) {
+    return (
+      <div className="rounded-xl border border-slate-700/60 bg-slate-800/30 h-64 flex items-center justify-center">
+        <div className="w-5 h-5 rounded-full border-t-2 border-emerald-400 animate-spin" />
       </div>
     );
   }
