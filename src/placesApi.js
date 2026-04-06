@@ -99,9 +99,10 @@ export async function findProspectsViaPlaces(locationStr, radiusOption, industry
     }
   }
 
-  // Belt-and-suspenders state filter on top of the AI prompt instruction
+  // Belt-and-suspenders state filter on top of the AI prompt instruction.
+  // Match ", IL" followed by a space, comma, or end-of-string to handle addresses with or without zip.
   const filtered = stateRestriction
-    ? places.filter((p) => p.address.includes(`, ${stateRestriction} `))
+    ? places.filter((p) => new RegExp(`, ${stateRestriction}(\\s|,|$)`).test(p.address))
     : places;
 
   return { places: filtered, geocodedLocation: formattedAddress };

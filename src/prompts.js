@@ -316,10 +316,14 @@ The first stop each day has driveMinutesFromPrevious of 0.
 If there are more stops than can fit in 5 days at 4-6 per day, list the overflow in unscheduled.
 No markdown fences. Return only the JSON object.`;
 
-export function buildRouteUserPrompt(stops) {
+export function buildRouteUserPrompt(stops, homeBase) {
+  const homeClause = homeBase
+    ? `\nStarting location for each day: ${homeBase.address} (${homeBase.lat}, ${homeBase.lng}). Cluster stops so each day begins near this point.\n`
+    : '';
+
   const stopList = stops.map((s, i) =>
     `${i + 1}. ID: ${s.id} | ${s.name} | ${s.address} | Type: ${s.type} | Coords: ${s.lat},${s.lng}`
   ).join('\n');
 
-  return `Schedule these ${stops.length} stops into an optimized weekly route:\n\n${stopList}`;
+  return `Schedule these ${stops.length} stops into an optimized weekly route:${homeClause}\n${stopList}`;
 }

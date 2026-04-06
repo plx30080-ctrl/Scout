@@ -16,5 +16,8 @@ export async function callAI(systemPrompt, userPrompt) {
 
   const data = await res.json();
   // Strip any accidental markdown code fences the model may add
-  return (data.text ?? '').replace(/```json|```/g, '').trim();
+  return (data.text ?? '').trim()
+    .replace(/^```(?:\w+)?\s*\n?/, '')
+    .replace(/\n?```\s*$/, '')
+    .trim();
 }

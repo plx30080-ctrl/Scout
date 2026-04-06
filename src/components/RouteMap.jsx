@@ -63,7 +63,7 @@ export default function RouteMap({ stops, onStopClick }) {
   }
 
   return (
-    <div className="rounded-xl overflow-hidden border border-slate-700/60" style={{ height: '400px' }}>
+    <div className="relative rounded-xl overflow-hidden border border-slate-700/60" style={{ height: '400px' }}>
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
       {stops.length > 0 && (
         <div className="absolute bottom-3 right-3 flex items-center gap-3 bg-slate-900/90 rounded-lg px-3 py-2 text-[10px] text-slate-400 pointer-events-none">

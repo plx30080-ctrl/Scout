@@ -5,7 +5,7 @@
 import { openDB } from 'idb';
 
 const DB_NAME = 'scout-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 function getDB() {
   return openDB(DB_NAME, DB_VERSION, {
@@ -17,6 +17,11 @@ function getDB() {
           autoIncrement: true,
         });
         searches.createIndex('by-timestamp', 'timestamp');
+      }
+
+      // Prospect status tracking: contacted, in-campaign, non-viable
+      if (!db.objectStoreNames.contains('prospectStatuses')) {
+        db.createObjectStore('prospectStatuses', { keyPath: 'prospectName' });
       }
 
       // Route Planner: pinned stops (prospects + existing clients)
@@ -52,15 +57,40 @@ function getDB() {
 
 // ─── Territory Research ───────────────────────────────────────────────────────
 
-export async function saveSearch(location, data) {
+export async function saveSearch(location, data, params = {}) {
   const db = await getDB();
-  return db.add('searches', { location, timestamp: Date.now(), data });
+  return db.add('searches', { location, timestamp: Date.now(), data, ...params });
 }
 
 export async function getRecentSearches(limit = 10) {
   const db = await getDB();
   const all = await db.getAllFromIndex('searches', 'by-timestamp');
   return all.reverse().slice(0, limit);
+}
+
+export async function getLatestSearch() {
+  const db = await getDB();
+  const all = await db.getAllFromIndex('searches', 'by-timestamp');
+  return all.length > 0 ? all[all.length - 1] : null;
+}
+
+// ─── Prospect Status ──────────────────────────────────────────────────────────
+
+// status: 'contacted' | 'in-campaign' | 'non-viable'
+export async function saveProspectStatus(prospectName, status) {
+  const db = await getDB();
+  return db.put('prospectStatuses', { prospectName, status, updatedAt: Date.now() });
+}
+
+export async function getProspectStatuses() {
+  const db = await getDB();
+  const all = await db.getAll('prospectStatuses');
+  return Object.fromEntries(all.map((r) => [r.prospectName, r.status]));
+}
+
+export async function clearProspectStatus(prospectName) {
+  const db = await getDB();
+  return db.delete('prospectStatuses', prospectName);
 }
 
 // ─── Pinned Stops (Route Planner) ─────────────────────────────────────────────

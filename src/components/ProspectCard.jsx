@@ -2,15 +2,24 @@
 import { useState } from 'react';
 import { HeatBadge, BrandBadge, JobBadge } from './Badges';
 
-export default function ProspectCard({ company, index, isSelected, onToggleSelect, onDismiss, onPrepForCall, onGenerateCampaign }) {
+const STATUS_CONFIG = {
+  'contacted':   { label: 'Contacted',   color: 'text-sky-400   border-sky-500/40   bg-sky-500/10'   },
+  'in-campaign': { label: 'In Campaign', color: 'text-violet-400 border-violet-500/40 bg-violet-500/10' },
+  'non-viable':  { label: 'Non-Viable',  color: 'text-slate-500  border-slate-600/40  bg-slate-700/20'  },
+};
+
+export default function ProspectCard({ company, index, isSelected, status, onToggleSelect, onSetStatus, onPrepForCall, onGenerateCampaign }) {
   const [expanded, setExpanded] = useState(false);
+  const isNonViable = status === 'non-viable';
 
   return (
     <div
       className={`rounded-xl border transition-all duration-200 overflow-hidden fade-in-up ${
-        isSelected
-          ? 'border-emerald-500/50 bg-emerald-500/5'
-          : 'border-slate-700/60 bg-slate-800/40 hover:border-slate-600/70 hover:bg-slate-800/60'
+        isNonViable
+          ? 'border-slate-700/40 bg-slate-800/20 opacity-50'
+          : isSelected
+            ? 'border-emerald-500/50 bg-emerald-500/5'
+            : 'border-slate-700/60 bg-slate-800/40 hover:border-slate-600/70 hover:bg-slate-800/60'
       }`}
       style={{ animationDelay: `${index * 55}ms` }}
     >
@@ -22,6 +31,11 @@ export default function ProspectCard({ company, index, isSelected, onToggleSelec
               <h3 className="text-slate-100 font-semibold text-[15px] leading-tight">{company.name}</h3>
               <HeatBadge score={company.heatScore} />
               {company.brand && <BrandBadge brand={company.brand} />}
+              {status && STATUS_CONFIG[status] && (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${STATUS_CONFIG[status].color}`}>
+                  {STATUS_CONFIG[status].label}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
               <span>{company.industry}</span>
@@ -41,7 +55,7 @@ export default function ProspectCard({ company, index, isSelected, onToggleSelec
             </div>
           </div>
 
-          {/* Right: job badge + checkbox + dismiss */}
+          {/* Right: job badge + checkbox + non-viable */}
           <div className="flex items-center gap-2.5 shrink-0">
             <JobBadge count={company.openRoles} />
             <button
@@ -60,9 +74,13 @@ export default function ProspectCard({ company, index, isSelected, onToggleSelec
               )}
             </button>
             <button
-              onClick={() => onDismiss(company.name)}
-              title="Dismiss — not a viable prospect"
-              className="w-5 h-5 rounded flex items-center justify-center text-slate-600 hover:text-slate-300 hover:bg-slate-700/60 transition-all shrink-0"
+              onClick={() => onSetStatus(company.name, 'non-viable')}
+              title={isNonViable ? 'Clear non-viable status' : 'Mark as non-viable'}
+              className={`w-5 h-5 rounded flex items-center justify-center transition-all shrink-0 ${
+                isNonViable
+                  ? 'text-slate-400 bg-slate-700/60'
+                  : 'text-slate-600 hover:text-slate-300 hover:bg-slate-700/60'
+              }`}
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -90,8 +108,25 @@ export default function ProspectCard({ company, index, isSelected, onToggleSelec
           </div>
         )}
 
+        {/* Status buttons */}
+        <div className="mt-3 flex items-center gap-2">
+          {['contacted', 'in-campaign'].map((s) => (
+            <button
+              key={s}
+              onClick={() => onSetStatus(company.name, s)}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-medium border transition-all ${
+                status === s
+                  ? STATUS_CONFIG[s].color
+                  : 'border-slate-700 text-slate-600 hover:border-slate-500 hover:text-slate-400'
+              }`}
+            >
+              {STATUS_CONFIG[s].label}
+            </button>
+          ))}
+        </div>
+
         {/* Action row */}
-        <div className="mt-3 flex items-center gap-4">
+        <div className="mt-2 flex items-center gap-4">
         <button
           onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-400 transition-colors"

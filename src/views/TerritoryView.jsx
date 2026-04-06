@@ -1,5 +1,5 @@
 // views/TerritoryView.jsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SearchPanel from '../components/SearchPanel';
 import ProspectCard from '../components/ProspectCard';
 import SummaryBar from '../components/SummaryBar';
@@ -10,6 +10,10 @@ import {
 } from '../prompts';
 import { findProspectsViaPlaces } from '../placesApi';
 import { bingSearch, buildTerritorySearchQueries } from '../searchApi';
+import {
+  saveSearch, getLatestSearch,
+  saveProspectStatus, getProspectStatuses, clearProspectStatus,
+} from '../storage';
 
 const HEAT_FILTERS = ['All', 'Hot', 'Warm', 'Cold'];
 
@@ -53,7 +57,7 @@ function exportToCSV(prospects, location) {
   URL.revokeObjectURL(url);
 }
 
-export default function TerritoryView({ onPrepForCall, onGenerateCampaign }) {
+export default function TerritoryView({ isActive, onPrepForCall, onGenerateCampaign }) {
   const [location, setLocation] = useState('');
   const [radius, setRadius] = useState('25 miles');
   const [industry, setIndustry] = useState('All Industries');
@@ -63,9 +67,37 @@ export default function TerritoryView({ onPrepForCall, onGenerateCampaign }) {
   const [error, setError] = useState(null);
   const [filterHeat, setFilterHeat] = useState('All');
   const [selected, setSelected] = useState(new Set());
-  const [dismissed, setDismissed] = useState(new Set());
+  const [statuses, setStatuses] = useState({}); // { companyName: 'contacted'|'in-campaign'|'non-viable' }
+  const [showNonViable, setShowNonViable] = useState(false);
   const [lastSearched, setLastSearched] = useState('');
   const [usedMaps, setUsedMaps] = useState(false);
+
+  // Restore last search and statuses on mount
+  useEffect(() => {
+    async function restore() {
+      const [latest, savedStatuses] = await Promise.all([
+        getLatestSearch(),
+        getProspectStatuses(),
+      ]);
+      if (latest) {
+        setProspects(latest.data);
+        setLastSearched(latest.location || '');
+        setLocation(latest.location || '');
+        if (latest.radius)           setRadius(latest.radius);
+        if (latest.industry)         setIndustry(latest.industry);
+        if (latest.stateRestriction) setStateRestriction(latest.stateRestriction);
+        if (latest.usedMaps)         setUsedMaps(latest.usedMaps);
+      }
+      setStatuses(savedStatuses);
+    }
+    restore();
+  }, []);
+
+  // Reload statuses when returning to this tab (other views may have written new statuses)
+  useEffect(() => {
+    if (!isActive) return;
+    getProspectStatuses().then(setStatuses).catch(() => {});
+  }, [isActive]);
 
   const loading = searchPhase !== null;
 
@@ -74,7 +106,6 @@ export default function TerritoryView({ onPrepForCall, onGenerateCampaign }) {
     setError(null);
     setProspects(null);
     setSelected(new Set());
-    setDismissed(new Set());
     setFilterHeat('All');
     setUsedMaps(false);
 
@@ -94,7 +125,7 @@ export default function TerritoryView({ onPrepForCall, onGenerateCampaign }) {
           places = null;
         }
 
-        if (places && places.length >= 5) {
+        if (places && places.length >= 1) {
           // ── Phase 2: Bing Search for territory intel ───────────────────
           setSearchPhase('searching');
           const queries  = buildTerritorySearchQueries(geocodedLocation || location, industry);
@@ -106,11 +137,16 @@ export default function TerritoryView({ onPrepForCall, onGenerateCampaign }) {
             TERRITORY_ENRICHMENT_SYSTEM_PROMPT,
             buildEnrichmentUserPrompt(places, geocodedLocation || location, radius, industry, state, snippets)
           );
-          const parsed = JSON.parse(raw);
+          let parsed = JSON.parse(raw);
           if (!Array.isArray(parsed)) throw new Error('Unexpected response format.');
+          if (state) {
+            const stateRe = new RegExp(`, ${state}(\\s|,|$)`);
+            parsed = parsed.filter((p) => stateRe.test(p.address || '') || stateRe.test(p.location || ''));
+          }
           setProspects(parsed);
           setLastSearched(location);
           setUsedMaps(true);
+          saveSearch(location, parsed, { radius, industry, stateRestriction, usedMaps: true });
           return;
         }
         // Not enough Places results — fall through to AI-only
@@ -122,10 +158,15 @@ export default function TerritoryView({ onPrepForCall, onGenerateCampaign }) {
         TERRITORY_SYSTEM_PROMPT,
         buildTerritoryUserPrompt(location, radius, industry, state)
       );
-      const parsed = JSON.parse(raw);
+      let parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) throw new Error('Unexpected response format.');
+      if (state) {
+        const stateRe = new RegExp(`, ${state}(\\s|,|$)`);
+        parsed = parsed.filter((p) => stateRe.test(p.address || '') || stateRe.test(p.location || ''));
+      }
       setProspects(parsed);
       setLastSearched(location);
+      saveSearch(location, parsed, { radius, industry, stateRestriction, usedMaps: false });
     } catch (err) {
       console.error(err);
       setError(
@@ -146,8 +187,15 @@ export default function TerritoryView({ onPrepForCall, onGenerateCampaign }) {
     });
   }
 
-  function handleDismiss(name) {
-    setDismissed((prev) => new Set([...prev, name]));
+  async function handleSetStatus(name, status) {
+    if (status === null || statuses[name] === status) {
+      // Toggle off
+      await clearProspectStatus(name);
+      setStatuses((prev) => { const n = { ...prev }; delete n[name]; return n; });
+    } else {
+      await saveProspectStatus(name, status);
+      setStatuses((prev) => ({ ...prev, [name]: status }));
+    }
     setSelected((prev) => { const n = new Set(prev); n.delete(name); return n; });
   }
 
@@ -157,7 +205,10 @@ export default function TerritoryView({ onPrepForCall, onGenerateCampaign }) {
     exportToCSV(toExport, lastSearched);
   }
 
-  const visible = prospects ? prospects.filter((p) => !dismissed.has(p.name)) : null;
+  const nonViableCount = prospects ? prospects.filter((p) => statuses[p.name] === 'non-viable').length : 0;
+  const visible = prospects
+    ? prospects.filter((p) => showNonViable || statuses[p.name] !== 'non-viable')
+    : null;
   const filtered = visible
     ? filterHeat === 'All' ? visible : visible.filter((p) => p.heatScore === filterHeat)
     : null;
@@ -195,7 +246,7 @@ export default function TerritoryView({ onPrepForCall, onGenerateCampaign }) {
           <SummaryBar
             prospects={visible}
             selectedCount={selected.size}
-            dismissedCount={dismissed.size}
+            nonViableCount={nonViableCount}
             onExport={handleExport}
             usedMaps={usedMaps}
           />
@@ -214,6 +265,18 @@ export default function TerritoryView({ onPrepForCall, onGenerateCampaign }) {
                 {h}
               </button>
             ))}
+            {nonViableCount > 0 && (
+              <button
+                onClick={() => setShowNonViable((v) => !v)}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  showNonViable
+                    ? 'bg-slate-600 border-slate-500 text-slate-300'
+                    : 'bg-slate-800 border-slate-700 text-slate-500 hover:border-slate-500'
+                }`}
+              >
+                {showNonViable ? `Hide non-viable (${nonViableCount})` : `Show non-viable (${nonViableCount})`}
+              </button>
+            )}
             {selected.size > 0 && (
               <button
                 onClick={() => setSelected(new Set())}
@@ -231,8 +294,9 @@ export default function TerritoryView({ onPrepForCall, onGenerateCampaign }) {
                 company={company}
                 index={i}
                 isSelected={selected.has(company.name)}
+                status={statuses[company.name] || null}
                 onToggleSelect={handleToggleSelect}
-                onDismiss={handleDismiss}
+                onSetStatus={handleSetStatus}
                 onPrepForCall={onPrepForCall}
                 onGenerateCampaign={onGenerateCampaign}
               />

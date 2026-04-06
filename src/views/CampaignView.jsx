@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { callAI } from '../api';
 import { CAMPAIGN_SYSTEM_PROMPT, buildCampaignUserPrompt } from '../prompts';
-import { saveGeneratedContent, getRecentGeneratedContent } from '../storage';
+import { saveGeneratedContent, getRecentGeneratedContent, saveProspectStatus } from '../storage';
 import Spinner from '../components/Spinner';
 
 const INDUSTRIES = [
@@ -151,7 +151,12 @@ export default function CampaignView({ prefill, onClearPrefill }) {
     setCompanyName(prefill.name || '');
     if (prefill.industry) setIndustry(prefill.industry);
     if (prefill.brand && prefill.brand !== 'Both') setBrand(prefill.brand);
-    setContext('');
+    const contextLines = [];
+    if (prefill.heatReason)          contextLines.push(`Why they're a prospect: ${prefill.heatReason}`);
+    if (prefill.newsSignal)          contextLines.push(`Recent news: ${prefill.newsSignal}`);
+    if (prefill.talkingPoints?.length) contextLines.push(`Key talking points:\n${prefill.talkingPoints.map((t) => `• ${t}`).join('\n')}`);
+    if (prefill.jobRoles?.length)    contextLines.push(`Currently hiring: ${prefill.jobRoles.join(', ')}`);
+    setContext(contextLines.join('\n\n'));
     setSequence(null);
     setError(null);
     onClearPrefill?.();
@@ -182,6 +187,7 @@ export default function CampaignView({ prefill, onClearPrefill }) {
       const record = { ...parsed, id: `${Date.now()}`, companyName: prospect.companyName };
 
       await saveGeneratedContent(record);
+      await saveProspectStatus(prospect.companyName, 'in-campaign').catch(() => {});
       setSequence(parsed);
       setActiveCompany(prospect.companyName);
       getRecentGeneratedContent(10).then(setRecent).catch(() => {});
@@ -268,14 +274,21 @@ export default function CampaignView({ prefill, onClearPrefill }) {
           <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-widest px-1">Recent Sequences</p>
           <div className="flex flex-wrap gap-2">
             {recent.map((c) => (
-              <span key={c.id}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-medium border ${
+              <button
+                key={c.id}
+                onClick={() => {
+                  setCompanyName(c.companyName);
+                  setSequence(c);
+                  setActiveCompany(c.companyName);
+                }}
+                className={`px-3.5 py-1.5 rounded-full text-xs font-medium border transition-all ${
                   activeCompany === c.companyName
                     ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                    : 'bg-slate-800 border-slate-700 text-slate-400'
-                }`}>
+                    : 'bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                }`}
+              >
                 {c.companyName}
-              </span>
+              </button>
             ))}
           </div>
         </div>

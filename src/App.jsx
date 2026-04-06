@@ -57,14 +57,19 @@ export default function App() {
 
       {/* Active view */}
       <main className="max-w-3xl mx-auto px-5 py-8">
-        {activeTab === 'territory' && <TerritoryView onPrepForCall={handlePrepForCall} onGenerateCampaign={handleGenerateCampaign} />}
-        {activeTab === 'routes'    && <RoutePlannerView />}
-        {activeTab === 'campaign'  && (
+        {/* TerritoryView stays mounted so search results survive tab switches */}
+        <div style={{ display: activeTab === 'territory' ? undefined : 'none' }}>
+          <TerritoryView isActive={activeTab === 'territory'} onPrepForCall={handlePrepForCall} onGenerateCampaign={handleGenerateCampaign} />
+        </div>
+        <div style={{ display: activeTab === 'routes' ? undefined : 'none' }}>
+          <RoutePlannerView />
+        </div>
+        <div style={{ display: activeTab === 'campaign' ? undefined : 'none' }}>
           <CampaignView
             prefill={campaignPrefill}
             onClearPrefill={() => setCampaignPrefill(null)}
           />
-        )}
+        </div>
         {activeTab === 'callprep'  && (
           <CallPrepView
             prefill={callPrepPrefill}

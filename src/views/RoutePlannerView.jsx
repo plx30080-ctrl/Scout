@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { callAI } from '../api';
 import { ROUTE_SYSTEM_PROMPT, buildRouteUserPrompt } from '../prompts';
 import { geocodeLocation } from '../placesApi';
-import { savePinnedStop, getPinnedStops, deletePinnedStop } from '../storage';
+import { savePinnedStop, getPinnedStops, deletePinnedStop, getLatestSearch } from '../storage';
 import { exportScheduleToICS } from '../utils/icalExport';
 import RouteMap from '../components/RouteMap';
 import WeekSchedule from '../components/WeekSchedule';
@@ -22,6 +22,21 @@ export default function RoutePlannerView() {
   const [addName,    setAddName]    = useState('');
   const [addAddress, setAddAddress] = useState('');
   const [addType,    setAddType]    = useState('prospect');
+
+  // Home base (starting location for route)
+  const [homeAddress, setHomeAddress] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('scout_home_base') || 'null')?.address || ''; } catch { return ''; }
+  });
+  const [homeBase, setHomeBase] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('scout_home_base') || 'null'); } catch { return null; }
+  });
+  const [savingHome, setSavingHome] = useState(false);
+
+  // Import from territory
+  const [showImport, setShowImport]         = useState(false);
+  const [importProspects, setImportProspects] = useState([]);
+  const [importSelected, setImportSelected]   = useState(new Set());
+  const [importing, setImporting]             = useState(false);
 
   const loadStops = useCallback(async () => {
     const data = await getPinnedStops().catch(() => []);
@@ -63,6 +78,78 @@ export default function RoutePlannerView() {
     setSchedule(null);
   }
 
+  async function handleSaveHomeBase() {
+    if (!homeAddress.trim()) {
+      localStorage.removeItem('scout_home_base');
+      setHomeBase(null);
+      return;
+    }
+    setSavingHome(true);
+    setError(null);
+    try {
+      const geo = await geocodeLocation(homeAddress.trim());
+      const hb  = { address: geo.formattedAddress || homeAddress.trim(), lat: geo.lat, lng: geo.lng };
+      setHomeBase(hb);
+      setHomeAddress(hb.address);
+      localStorage.setItem('scout_home_base', JSON.stringify(hb));
+    } catch {
+      setError('Could not locate that starting address. Try a full street address.');
+    } finally {
+      setSavingHome(false);
+    }
+  }
+
+  async function handleShowImport() {
+    const latest = await getLatestSearch().catch(() => null);
+    if (!latest?.data?.length) {
+      setError('No territory search found. Run a territory search first.');
+      return;
+    }
+    setImportProspects(latest.data);
+    setImportSelected(new Set());
+    setShowImport(true);
+  }
+
+  function toggleImport(name) {
+    setImportSelected((prev) => {
+      const next = new Set(prev);
+      next.has(name) ? next.delete(name) : next.add(name);
+      return next;
+    });
+  }
+
+  async function handleImportSelected() {
+    if (importSelected.size === 0) return;
+    setImporting(true);
+    setError(null);
+    const existingNames = new Set(stops.map((s) => s.name));
+    const toAdd = importProspects.filter((p) => importSelected.has(p.name) && !existingNames.has(p.name));
+
+    const failed = [];
+    for (const p of toAdd) {
+      try {
+        const geo  = await geocodeLocation(p.address);
+        const stop = {
+          id:      uuid(),
+          name:    p.name,
+          address: geo.formattedAddress || p.address,
+          lat:     geo.lat,
+          lng:     geo.lng,
+          type:    'prospect',
+        };
+        await savePinnedStop(stop);
+      } catch {
+        failed.push(p.name);
+      }
+    }
+    await loadStops();
+    setShowImport(false);
+    setImporting(false);
+    if (failed.length > 0) {
+      setError(`Could not locate ${failed.length} stop${failed.length > 1 ? 's' : ''}: ${failed.join(', ')}. Try adding them manually with a full street address.`);
+    }
+  }
+
   async function handleGenerateRoute() {
     if (stops.length < 2) return;
     setLoading(true);
@@ -70,7 +157,7 @@ export default function RoutePlannerView() {
     setSchedule(null);
 
     try {
-      const raw    = await callAI(ROUTE_SYSTEM_PROMPT, buildRouteUserPrompt(stops));
+      const raw    = await callAI(ROUTE_SYSTEM_PROMPT, buildRouteUserPrompt(stops, homeBase));
       const parsed = JSON.parse(raw);
       if (!parsed.week) throw new Error('Unexpected response format.');
 
@@ -136,6 +223,119 @@ export default function RoutePlannerView() {
             </div>
           </div>
         </form>
+
+        {/* Home base / starting location */}
+        <div className="pt-3 border-t border-slate-700/40 space-y-2">
+          <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">
+            Starting Location <span className="text-slate-600 normal-case font-normal">(optional — used to anchor each day's route)</span>
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={homeAddress}
+              onChange={(e) => setHomeAddress(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveHomeBase()}
+              placeholder="e.g. 123 Office Pkwy, St. Louis, MO"
+              className="flex-1 px-3.5 py-2.5 rounded-lg bg-slate-900/60 border border-slate-700 text-slate-100 placeholder-slate-600 text-sm focus:outline-none focus:border-emerald-500/60 transition-all"
+            />
+            <button
+              type="button"
+              onClick={handleSaveHomeBase}
+              disabled={savingHome}
+              className="px-4 py-2.5 rounded-lg text-xs font-semibold bg-slate-700 border border-slate-600 text-slate-300 hover:bg-slate-600 disabled:opacity-40 transition-all"
+            >
+              {savingHome ? '...' : homeBase ? 'Update' : 'Set'}
+            </button>
+          </div>
+          {homeBase && (
+            <p className="text-[11px] text-emerald-400/70">Starting from: {homeBase.address}</p>
+          )}
+        </div>
+
+        {/* Import from territory list */}
+        <div className="pt-3 border-t border-slate-700/40">
+          {!showImport ? (
+            <button
+              type="button"
+              onClick={handleShowImport}
+              className="flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-emerald-400 transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              Import from Territory List
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-slate-300">
+                  Select prospects to add ({importSelected.size} selected)
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowImport(false)}
+                  className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+              <div className="max-h-64 overflow-y-auto space-y-1 pr-1">
+                {importProspects.map((p) => {
+                  const alreadyAdded = stops.some((s) => s.name === p.name);
+                  return (
+                    <label
+                      key={p.name}
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
+                        alreadyAdded
+                          ? 'opacity-40 cursor-not-allowed'
+                          : importSelected.has(p.name)
+                            ? 'bg-emerald-500/10 border border-emerald-500/30'
+                            : 'bg-slate-800/40 border border-transparent hover:border-slate-600'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        disabled={alreadyAdded}
+                        checked={importSelected.has(p.name)}
+                        onChange={() => !alreadyAdded && toggleImport(p.name)}
+                        className="accent-emerald-500 shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-slate-200 truncate">{p.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{p.address || p.location}</p>
+                      </div>
+                      <span className={`text-[10px] font-semibold shrink-0 ${
+                        p.heatScore === 'Hot' ? 'text-rose-400' :
+                        p.heatScore === 'Warm' ? 'text-amber-400' : 'text-slate-500'
+                      }`}>
+                        {alreadyAdded ? 'Added' : p.heatScore}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setImportSelected(new Set(
+                    importProspects.filter((p) => !stops.some((s) => s.name === p.name)).map((p) => p.name)
+                  ))}
+                  className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  onClick={handleImportSelected}
+                  disabled={importing || importSelected.size === 0}
+                  className="ml-auto px-4 py-2 rounded-lg text-xs font-semibold bg-emerald-500 text-white hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  {importing ? 'Adding...' : `Add ${importSelected.size} Stop${importSelected.size !== 1 ? 's' : ''}`}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {error && (
           <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">

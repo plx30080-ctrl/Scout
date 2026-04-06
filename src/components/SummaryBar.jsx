@@ -1,6 +1,6 @@
 // components/SummaryBar.jsx
 
-export default function SummaryBar({ prospects, selectedCount, dismissedCount, onExport, usedMaps }) {
+export default function SummaryBar({ prospects, selectedCount, nonViableCount, onExport, usedMaps }) {
   const hot = prospects.filter((p) => p.heatScore === 'Hot').length;
   const warm = prospects.filter((p) => p.heatScore === 'Warm').length;
   const totalRoles = prospects.reduce((sum, p) => sum + (p.openRoles || 0), 0);
@@ -16,8 +16,8 @@ export default function SummaryBar({ prospects, selectedCount, dismissedCount, o
         {totalRoles > 0 && (
           <span className="text-violet-400 font-semibold">{totalRoles} open roles</span>
         )}
-        {dismissedCount > 0 && (
-          <span className="text-slate-600 font-medium">{dismissedCount} dismissed</span>
+        {nonViableCount > 0 && (
+          <span className="text-slate-600 font-medium">{nonViableCount} non-viable</span>
         )}
       </div>
       <button
