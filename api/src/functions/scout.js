@@ -31,20 +31,36 @@ app.http('scout', {
       return { status: 400, jsonBody: { error: 'systemPrompt and userPrompt are required.' } };
     }
 
+    const bingKey = process.env.BING_SEARCH_KEY;
+
+    const payload = {
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user',   content: userPrompt   },
+      ],
+      max_tokens: 8000,
+      temperature: 0.7,
+    };
+
+    // When a Bing key is present, enable Grounding with Bing Search so the
+    // model can pull live web results automatically during generation.
+    if (bingKey) {
+      payload.data_sources = [{
+        type: 'bing_search',
+        parameters: {
+          endpoint: 'https://api.bing.microsoft.com/v7.0/search',
+          key: bingKey,
+        },
+      }];
+    }
+
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'api-key': key,
       },
-      body: JSON.stringify({
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user',   content: userPrompt   },
-        ],
-        max_tokens: 8000,
-        temperature: 0.7,
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!res.ok) {

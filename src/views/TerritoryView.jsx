@@ -9,7 +9,6 @@ import {
   TERRITORY_ENRICHMENT_SYSTEM_PROMPT, buildEnrichmentUserPrompt,
 } from '../prompts';
 import { findProspectsViaPlaces } from '../placesApi';
-import { bingSearch, buildTerritorySearchQueries } from '../searchApi';
 import {
   saveSearch, getLatestSearch,
   saveProspectStatus, getProspectStatuses, clearProspectStatus,
@@ -127,16 +126,12 @@ export default function TerritoryView({ isActive, onPrepForCall, onGenerateCampa
         }
 
         if (places && places.length >= 1) {
-          // ── Phase 2: Bing Search for territory intel ───────────────────
-          setSearchPhase('searching');
-          const queries  = buildTerritorySearchQueries(geocodedLocation || location, industry);
-          const snippets = (await Promise.all(queries.map((q) => bingSearch(q, 8)))).flat();
-
-          // ── Phase 3: AI enrichment of real Places data + Bing intel ────
+          // ── Phase 2: AI enrichment of real Places data ─────────────────
+          // Bing grounding is handled server-side inside the AI call.
           setSearchPhase('analyzing');
           const raw = await callAI(
             TERRITORY_ENRICHMENT_SYSTEM_PROMPT,
-            buildEnrichmentUserPrompt(places, geocodedLocation || location, radius, industry, state, snippets)
+            buildEnrichmentUserPrompt(places, geocodedLocation || location, radius, industry, state, [])
           );
           let parsed = JSON.parse(raw);
           if (!Array.isArray(parsed)) throw new Error('Unexpected response format.');
