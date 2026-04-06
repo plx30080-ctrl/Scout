@@ -27,13 +27,17 @@ app.http('search', {
       return { status: 400, jsonBody: { error: 'query is required.' } };
     }
 
+    // Grounding with Bing Search uses a configurable endpoint.
+    // Default falls back to the classic v7 URL for backwards compatibility.
+    const bingEndpoint = (process.env.BING_SEARCH_ENDPOINT || 'https://api.bing.microsoft.com/v7.0/search').replace(/\/$/, '');
+
     const url =
-      `https://api.bing.microsoft.com/v7.0/search` +
+      `${bingEndpoint}` +
       `?q=${encodeURIComponent(query)}` +
       `&count=${count}` +
       `&mkt=en-US` +
       `&safeSearch=Moderate` +
-      `&freshness=Month`;    // bias toward recent results
+      `&freshness=Month`;
 
     const res = await fetch(url, {
       headers: { 'Ocp-Apim-Subscription-Key': bingKey },
