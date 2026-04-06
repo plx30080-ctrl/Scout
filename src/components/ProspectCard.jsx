@@ -8,7 +8,7 @@ const STATUS_CONFIG = {
   'non-viable':  { label: 'Non-Viable',  color: 'text-slate-500  border-slate-600/40  bg-slate-700/20'  },
 };
 
-export default function ProspectCard({ company, index, isSelected, status, onToggleSelect, onSetStatus, onPrepForCall, onGenerateCampaign }) {
+export default function ProspectCard({ company, index, isSelected, status, onToggleSelect, onSetStatus, onPrepForCall, onGenerateCampaign, onSaveToAccounts, savedToAccounts }) {
   const [expanded, setExpanded] = useState(false);
   const isNonViable = status === 'non-viable';
 
@@ -159,6 +159,25 @@ export default function ProspectCard({ company, index, isSelected, status, onTog
                 d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
             Generate campaign
+          </button>
+        )}
+        {onSaveToAccounts && (
+          <button
+            onClick={() => onSaveToAccounts(company)}
+            disabled={savedToAccounts?.has(company.name)}
+            className={`flex items-center gap-1.5 text-xs transition-colors ${
+              savedToAccounts?.has(company.name)
+                ? 'text-emerald-500 cursor-default'
+                : 'text-slate-500 hover:text-emerald-400'
+            }`}
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d={savedToAccounts?.has(company.name)
+                  ? 'M5 13l4 4L19 7'
+                  : 'M12 4v16m8-8H4'} />
+            </svg>
+            {savedToAccounts?.has(company.name) ? 'Saved' : 'Save to accounts'}
           </button>
         )}
         </div>

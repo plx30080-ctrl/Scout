@@ -13,6 +13,7 @@ import { bingSearch, buildTerritorySearchQueries } from '../searchApi';
 import {
   saveSearch, getLatestSearch,
   saveProspectStatus, getProspectStatuses, clearProspectStatus,
+  saveProspect, getProspectByName,
 } from '../storage';
 
 const HEAT_FILTERS = ['All', 'Hot', 'Warm', 'Cold'];
@@ -70,6 +71,7 @@ export default function TerritoryView({ isActive, onPrepForCall, onGenerateCampa
   const [showNonViable, setShowNonViable] = useState(false);
   const [lastSearched, setLastSearched] = useState('');
   const [usedMaps, setUsedMaps] = useState(false);
+  const [savedToAccounts, setSavedToAccounts] = useState(new Set());
 
   // Restore last search and statuses on mount
   useEffect(() => {
@@ -198,6 +200,21 @@ export default function TerritoryView({ isActive, onPrepForCall, onGenerateCampa
     setSelected((prev) => { const n = new Set(prev); n.delete(name); return n; });
   }
 
+  async function handleSaveToAccounts(company) {
+    const existing = await getProspectByName(company.name);
+    await saveProspect({
+      ...(existing || {}),
+      companyName: company.name,
+      address: company.address || company.location || '',
+      industry: company.industry || '',
+      heatScore: company.heatScore || '',
+      status: existing?.status || 'prospect',
+      contacts: existing?.contacts || [],
+      notes: existing?.notes || '',
+    });
+    setSavedToAccounts((prev) => new Set([...prev, company.name]));
+  }
+
   function handleExport() {
     if (!visible) return;
     const toExport = selected.size > 0 ? visible.filter((p) => selected.has(p.name)) : visible;
@@ -298,6 +315,8 @@ export default function TerritoryView({ isActive, onPrepForCall, onGenerateCampa
                 onSetStatus={handleSetStatus}
                 onPrepForCall={onPrepForCall}
                 onGenerateCampaign={onGenerateCampaign}
+                onSaveToAccounts={handleSaveToAccounts}
+                savedToAccounts={savedToAccounts}
               />
             ))}
           </div>
