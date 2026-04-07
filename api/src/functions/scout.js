@@ -12,15 +12,12 @@ app.http('scout', {
     const baseEndpoint = process.env.AZURE_OPENAI_ENDPOINT; // e.g. https://my-resource.openai.azure.com
     const key          = process.env.AZURE_OPENAI_KEY;
     const deployment   = process.env.AZURE_OPENAI_DEPLOYMENT || 'Azure-Scout';
-    const bingKey      = process.env.BING_SEARCH_KEY;
 
     if (!baseEndpoint || !key) {
       return { status: 500, jsonBody: { error: 'Azure OpenAI is not configured on the server.' } };
     }
 
-    // bing_search grounding requires 2025-01-01-preview or newer
-    const apiVersion = bingKey ? '2025-01-01-preview' : '2024-08-01-preview';
-    const endpoint = `${baseEndpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+    const endpoint = `${baseEndpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=2024-08-01-preview`;
 
     let body;
     try {
@@ -42,18 +39,6 @@ app.http('scout', {
       max_tokens: 8000,
       temperature: 0.7,
     };
-
-    // When a Bing key is present, enable Grounding with Bing Search so the
-    // model can pull live web results automatically during generation.
-    if (bingKey) {
-      payload.data_sources = [{
-        type: 'bing_search',
-        parameters: {
-          endpoint: 'https://api.bing.microsoft.com/v7.0/search',
-          key: bingKey,
-        },
-      }];
-    }
 
     const res = await fetch(endpoint, {
       method: 'POST',
