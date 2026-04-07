@@ -12,12 +12,15 @@ app.http('scout', {
     const baseEndpoint = process.env.AZURE_OPENAI_ENDPOINT; // e.g. https://my-resource.openai.azure.com
     const key          = process.env.AZURE_OPENAI_KEY;
     const deployment   = process.env.AZURE_OPENAI_DEPLOYMENT || 'Azure-Scout';
+    const bingKey      = process.env.BING_SEARCH_KEY;
 
     if (!baseEndpoint || !key) {
       return { status: 500, jsonBody: { error: 'Azure OpenAI is not configured on the server.' } };
     }
 
-    const endpoint = `${baseEndpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=2024-08-01-preview`;
+    // bing_search grounding requires 2025-01-01-preview or newer
+    const apiVersion = bingKey ? '2025-01-01-preview' : '2024-08-01-preview';
+    const endpoint = `${baseEndpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
 
     let body;
     try {
@@ -30,8 +33,6 @@ app.http('scout', {
     if (!systemPrompt || !userPrompt) {
       return { status: 400, jsonBody: { error: 'systemPrompt and userPrompt are required.' } };
     }
-
-    const bingKey = process.env.BING_SEARCH_KEY;
 
     const payload = {
       messages: [
